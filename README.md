@@ -1,1 +1,2 @@
-# gpmgirlshostel
+# gpmhostel
+Hostel Management System
