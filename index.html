@@ -117,6 +117,7 @@
   .badge-pending{background:var(--warning-bg);color:var(--warning)}
   .badge-approved{background:var(--success-bg);color:var(--success)}
   .badge-rejected{background:var(--danger-bg);color:var(--danger)}
+  .badge-debarred{background:#3d0000;color:#ff9999;border:1px solid var(--danger)}
 
   /* ── ALERT ── */
   .alert{border-radius:var(--radius-md);padding:12px 16px;font-size:13px;margin-bottom:16px;border-left:3px solid}
@@ -431,19 +432,25 @@
       <textarea id="ns-address" rows="2" placeholder="Street, Village, Tehsil…"></textarea>
     </div>
     <div class="field">
-      <label>Admission Semester <span class="req">*</span></label>
-      <select id="ns-semester">
-        <option value="">— Select semester —</option>
-        <option value="1">Semester 1</option>
-        <option value="2">Semester 2</option>
-        <option value="3">Semester 3</option>
-        <option value="4">Semester 4</option>
-        <option value="5">Semester 5</option>
-        <option value="6">Semester 6</option>
-        <option value="7">Semester 7</option>
-        <option value="8">Semester 8</option>
-      </select>
-      <div class="hint" style="font-size:11px;color:var(--gray-400);margin-top:4px">Select the semester in which you are seeking hostel admission.</div>
+      <label>Admission Session <span class="req">*</span></label>
+      <!-- Hidden field holds composed value e.g. "Odd 2026" — read by all existing JS -->
+      <input type="hidden" id="ns-semester"/>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="ns-sem-type" onchange="composeAdmissionSession()"
+          style="padding:10px 13px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-size:14px;background:#fff;min-width:120px">
+          <option value="Odd">Odd (Jul–Dec)</option>
+          <option value="Even">Even (Jan–Jun)</option>
+        </select>
+        <input type="text" id="ns-sem-year" maxlength="4" placeholder="e.g. 2026"
+          oninput="composeAdmissionSession()"
+          style="padding:10px 13px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-size:14px;width:120px"/>
+        <div id="ns-sem-preview" style="font-size:15px;font-weight:700;color:var(--navy);padding:8px 16px;
+          background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:var(--radius-md);
+          min-width:140px;text-align:center">—</div>
+      </div>
+      <div class="hint" style="font-size:11px;color:var(--gray-400);margin-top:6px">
+        Select Odd or Even and enter the 4-digit year. Pre-filled from the current active hostel session.
+      </div>
       <div class="err-msg hidden" id="err-ns-semester"></div>
     </div>
     <div class="btn-row">
@@ -946,6 +953,7 @@
         <button class="tab-btn" onclick="wrTab('unlock')">🔓 Unlock Account</button>
         <button class="tab-btn" onclick="wrTab('datesettings')">📅 Date Windows</button>
         <button class="tab-btn" onclick="wrTab('reports')">📊 Reports</button>
+        <button class="tab-btn" onclick="wrTab('debar')" id="wr-tab-btn-debar">🚫 Debar Students</button>
       </div>
 
       <!-- Applications Tab -->
@@ -1068,14 +1076,11 @@
           <hr class="divider"/>
           <div id="nd-student-info"></div>
           <div class="field" style="margin:14px 0 0">
-            <label>Issuing No Dues for Semester <span class="req">*</span></label>
+            <label>Issuing No Dues for Session <span class="req">*</span></label>
             <select id="nd-sem-select" onchange="recalcDues()">
-              <option value="">— Select semester —</option>
-              <option value="1">Semester 1</option><option value="2">Semester 2</option>
-              <option value="3">Semester 3</option><option value="4">Semester 4</option>
-              <option value="5">Semester 5</option><option value="6">Semester 6</option>
-              <option value="7">Semester 7</option><option value="8">Semester 8</option>
+              <option value="">— Select session —</option>
             </select>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:4px">Sessions are populated from this student's fee payment history.</div>
           </div>
           <div id="nd-dues-checks" style="margin:14px 0"></div>
           <div id="nd-fee-table" style="margin-bottom:14px"></div>
@@ -1219,15 +1224,15 @@
         </div>
 
         <!-- ══════════════════════════════════════════
-             PANEL 3 — New Semester Session Window
+             PANEL 3 — New Session Window
              ══════════════════════════════════════════ -->
         <div class="dw-panel" id="panel-semester" style="border:1.5px solid #fce4b3;border-radius:var(--radius-lg);background:#fffbf0;margin-bottom:18px;overflow:hidden">
           <div style="background:linear-gradient(135deg,#7a5c00 0%,#a07820 100%);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <div style="display:flex;align-items:center;gap:10px">
               <span style="font-size:22px">🎓</span>
               <div>
-                <div style="font-family:'Playfair Display',serif;font-size:15px;color:#fff;font-weight:700">Panel 3 — New Semester Session Window (Odd / Even)</div>
-                <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px">Activates a new semester and adds ₹4,500 fee to all registered students</div>
+                <div style="font-family:'Playfair Display',serif;font-size:15px;color:#fff;font-weight:700">Panel 3 — New Session Window (Odd / Even)</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px">Activates a new session and adds ₹4,500 fee to all registered students</div>
               </div>
             </div>
             <span id="dw-p3-badge" class="dw-status-badge" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)">— Loading —</span>
@@ -1235,7 +1240,7 @@
           <div style="padding:18px 20px">
             <div style="background:#fff3cd;border:1px solid #ffe082;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#7a5c00;display:flex;align-items:flex-start;gap:8px">
               <span style="font-size:16px;flex-shrink:0">⚠️</span>
-              <div><strong>Deliberate Action Required:</strong> Activating a new semester is irreversible for the current cycle. A confirmation dialog will appear before saving. On activation, ₹4,500 hostel fee appears as due on <em>all currently registered (Approved) students</em>' accounts immediately.</div>
+              <div><strong>Deliberate Action Required:</strong> Activating a new session is irreversible for the current cycle. A confirmation dialog will appear before saving. On activation, ₹4,500 hostel fee appears as due on <em>all currently approved students</em>' accounts immediately.</div>
             </div>
             <div class="form-row" style="margin-bottom:12px">
               <div class="field" style="margin-bottom:0">
@@ -1282,7 +1287,7 @@
             <div id="sem-init-result" style="margin-bottom:8px"></div>
             <!-- Activation button — deliberately styled danger to signal importance -->
             <button class="btn btn-danger" onclick="initNewSemesterV2()" id="btn-sem-init" style="font-weight:600">
-              🎓 Activate Semester Session
+              🎓 Activate New Session
             </button>
             <div style="font-size:11px;color:var(--gray-400);margin-top:6px">A confirmation dialog will appear before this action is committed.</div>
           </div>
@@ -1309,7 +1314,7 @@
             </div>
             <!-- Current deadline display -->
             <div style="background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
-              <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;letter-spacing:.3px;text-transform:uppercase">Current Semester Payment Deadline</div>
+              <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;letter-spacing:.3px;text-transform:uppercase">Current Session Payment Deadline</div>
               <div id="dw-p4-deadline-info">
                 <div style="font-size:12px;color:var(--gray-400);font-style:italic">Activate a semester in Panel 3 to see the auto-calculated deadline here.</div>
               </div>
@@ -1337,7 +1342,7 @@
               </div>
             </div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <button class="btn btn-sm" style="background:#3a1a7c;color:#fff;border-color:#3a1a7c" onclick="recalcSemFines()">🔄 Recalculate Semester Late Fines Now</button>
+              <button class="btn btn-sm" style="background:#3a1a7c;color:#fff;border-color:#3a1a7c" onclick="recalcSemFines()">🔄 Recalculate Session Late Fines Now</button>
               <div id="dw-p4-calc-result" style="font-size:12px"></div>
             </div>
           </div>
@@ -1555,9 +1560,166 @@
           </div>
         </div>
 
+        <!-- ── REPORT 3: DEBARMENT REGISTER ──────────────────────────────── -->
+        <div style="border:1.5px solid #f5c6c6;border-radius:var(--radius-lg);overflow:hidden;margin-bottom:20px">
+          <div style="background:linear-gradient(135deg,#7a1a1a,#a02828);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px">🚫</span>
+              <div>
+                <div style="font-family:'Playfair Display',serif;font-size:15px;color:#fff;font-weight:700">Report 3 — Debarment Register</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65)">All debarred students · debarment period · reason · status</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" style="background:#fff;color:#7a1a1a;border-color:#fff;font-weight:600" onclick="generateDebarReport('xlsx')">⬇ Download .xlsx</button>
+              <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.4)" onclick="generateDebarReport('pdf')">🖨 Print / PDF</button>
+            </div>
+          </div>
+          <div style="padding:16px 20px;background:#fff5f5">
+            <div style="background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-600);margin-bottom:10px">🔍 Filters</div>
+              <div class="form-row" style="margin-bottom:8px">
+                <div class="field" style="margin-bottom:0">
+                  <label>Roll No. / Name</label>
+                  <input type="text" id="rpt3-filter-roll" placeholder="Search…" oninput="renderDebarReport()"/>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Semester / Session</label>
+                  <input type="text" id="rpt3-filter-sem" placeholder="e.g. Odd 2026 or Even 2027" oninput="renderDebarReport()"/>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Debar Status</label>
+                  <select id="rpt3-filter-status" onchange="renderDebarReport()">
+                    <option value="all">All Records</option>
+                    <option value="active">Active Only</option>
+                    <option value="lifted">Lifted Only</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:0;display:flex;align-items:flex-end">
+                  <button class="btn btn-sm btn-secondary" onclick="clearRpt3Filters()" style="width:100%">✕ Clear</button>
+                </div>
+              </div>
+              <span id="rpt3-count" style="font-size:12px;color:var(--gray-600)"></span>
+            </div>
+            <div id="rpt3-table-wrap" style="overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-md);background:#fff">
+              <div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">Click <strong>Load Report</strong> to fetch latest data.</div>
+            </div>
+            <div id="rpt3-summary" style="margin-top:12px;display:none">
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Total Records</div>
+                  <div id="rpt3-sum-total" style="font-size:20px;font-weight:700;color:var(--navy)">—</div>
+                </div>
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Active Debars</div>
+                  <div id="rpt3-sum-active" style="font-size:20px;font-weight:700;color:var(--danger)">—</div>
+                </div>
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Lifted</div>
+                  <div id="rpt3-sum-lifted" style="font-size:20px;font-weight:700;color:var(--success)">—</div>
+                </div>
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Fee Waivers</div>
+                  <div id="rpt3-sum-waived" style="font-size:20px;font-weight:700;color:var(--warning)">—</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn btn-sm" style="background:#7a1a1a;color:#fff;border-color:#7a1a1a" onclick="loadDebarReport()" id="btn-load-rpt3">🔄 Load / Refresh Report</button>
+              <span id="rpt3-load-status" style="font-size:12px;margin-left:10px"></span>
+            </div>
+          </div>
+        </div>
+
       </div><!-- end wr-tab-reports -->
 
-    </div><!-- .card -->
+      <!-- Debar Students Tab -->
+      <div id="wr-tab-debar" class="hidden">
+        <div class="card" style="border-left:4px solid var(--danger);background:var(--danger-bg);margin-bottom:16px">
+          <div style="font-weight:700;color:var(--danger);font-size:14px;margin-bottom:4px">⚠ Debarment Notice</div>
+          <div style="font-size:13px;color:var(--gray-600)">
+            Debarring a student prevents them from staying in the hostel for the selected session(s).
+            <strong>Session fee is automatically waived</strong> for debarred sessions.
+            Debarment can be lifted at any time using the Restore button.
+          </div>
+        </div>
+
+        <!-- Debar a Student Form -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" style="font-size:17px">🚫 Debar a Student</div>
+          <div class="card-subtitle">Select a student and the session(s) they are debarred from.</div>
+
+          <div class="field">
+            <label>Student <span class="req">*</span></label>
+            <select id="wr-debar-roll" onchange="onDebarStudentChange()">
+              <option value="">— Select Student —</option>
+            </select>
+            <div class="err-msg hidden" id="err-wr-debar-roll"></div>
+          </div>
+
+          <div id="wr-debar-student-info" class="hidden" style="background:var(--info-bg);border:1px solid #b5d4f4;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--info);margin-bottom:14px"></div>
+
+          <div class="field">
+            <label>Session(s) to Debar <span class="req">*</span></label>
+            <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Add one or more sessions. The student will not be charged for these sessions.</div>
+            <!-- Session picker: Odd/Even + year → Add as tag -->
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+              <select id="wr-debar-sem-type"
+                style="padding:9px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-size:13px;background:#fff;min-width:130px">
+                <option value="Odd">Odd (Jul–Dec)</option>
+                <option value="Even">Even (Jan–Jun)</option>
+              </select>
+              <input type="text" id="wr-debar-sem-year" maxlength="4" placeholder="Year e.g. 2026"
+                style="padding:9px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-size:13px;width:130px"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addDebarSession();}"/>
+              <div id="wr-debar-sem-preview" style="font-size:14px;font-weight:700;color:var(--navy);padding:7px 14px;
+                background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:var(--radius-md);min-width:120px;text-align:center">—</div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addDebarSession()" style="white-space:nowrap">+ Add Session</button>
+            </div>
+            <!-- Added sessions shown as removable tags -->
+            <div id="wr-debar-sem-tags" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;min-height:28px"></div>
+            <!-- hidden container kept for backward-compat JS reading .debar-sem-chk -->
+            <div id="wr-debar-sem-checkboxes" style="display:none"></div>
+            <div class="err-msg hidden" id="err-wr-debar-sems"></div>
+          </div>
+
+          <div class="field">
+            <label>Reason for Debarment <span class="req">*</span></label>
+            <textarea id="wr-debar-reason" rows="3" placeholder="State the reason for debarring this student (e.g. disciplinary action, misconduct, etc.)…" style="width:100%;padding:10px 13px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical"></textarea>
+            <div class="err-msg hidden" id="err-wr-debar-reason"></div>
+          </div>
+
+          <div id="wr-debar-result" style="margin-bottom:12px"></div>
+          <button class="btn btn-danger" onclick="doDebarStudent()" id="btn-wr-debar" style="font-weight:600">🚫 Confirm Debarment</button>
+        </div>
+
+        <!-- Existing Debar Records -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+            <div>
+              <div class="card-title" style="font-size:17px">📋 Debar Records</div>
+              <div class="card-subtitle">All students with active or historical debar records.</div>
+            </div>
+            <div style="background:var(--success-bg);border:1px solid var(--success);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--success);max-width:280px">
+              <strong>✅ To Restore / Lift a Debarment:</strong><br/>
+              Find the student record below and click the <strong>"✅ Lift Debarment"</strong> button on their active debar card.
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;margin-top:12px">
+            <input type="text" id="wr-debar-search" placeholder="Search by name or roll number…" oninput="renderDebarList()"
+              style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-size:13px"/>
+            <select id="wr-debar-filter" onchange="renderDebarList()" style="padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-size:13px">
+              <option value="all">All Records</option>
+              <option value="active">Active Only</option>
+              <option value="lifted">Lifted Only</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadDebarRecords()">🔄 Refresh</button>
+          </div>
+          <div id="wr-debar-list"><p style="color:var(--gray-400);font-size:13px">Loading debar records…</p></div>
+        </div>
+      </div><!-- end wr-tab-debar -->
+
+
     <div id="wr-approve-panel" class="hidden">
       <button class="back-link" onclick="wrCloseApprove()" style="margin-bottom:12px" id="wr-back-btn">← Back</button>
       <div class="card" style="border:1.5px solid var(--navy-mid)">
@@ -1611,6 +1773,17 @@
           </div>
           <button class="btn btn-danger" onclick="rejectApplication()" id="wr-reject-btn">
             ✗ Reject Application &amp; Notify Student
+          </button>
+        </div>
+        <!-- Quick Debar Section (visible for approved/pending students only) -->
+        <div id="wr-quick-debar-section" style="margin-top:16px;border-top:1px solid var(--gray-100);padding-top:16px;display:none">
+          <div class="section-heading" style="color:var(--danger)">🚫 Debar from Hostel</div>
+          <div style="font-size:13px;color:var(--gray-600);margin-bottom:12px">
+            Debar this student for one or more sessions. Session fee will be automatically waived for debarred sessions.
+            You can manage all debar records from the <strong>Debar Students</strong> tab.
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="quickDebarFromPanel()" style="font-size:13px">
+            🚫 Go to Debar Students Tab
           </button>
         </div>
       </div>
@@ -2043,6 +2216,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate district dropdown
   const dd = document.getElementById('ns-district');
   BIHAR_DISTRICTS.forEach(d => { const o = document.createElement('option'); o.text = d; if(d==='Patna') o.selected=true; dd.add(o); });
+  // Populate admission session dropdown dynamically (auto-generates future sessions)
+  populateAdmissionSessionDropdown();
   // Warden fine date default
   document.getElementById('wr-fine-date').value = new Date().toISOString().slice(0,10);
   updateRollPreview();
@@ -2348,14 +2523,32 @@ function applyInputFormatting() {
 
 /**
  * Disambiguate semester/session display.
- * Numeric "1"–"8" => "Semester 4" (student's current semester number)
+ * Session string like "Odd 2026" => "Odd 2026 Session"
  * Session string like "Odd 2026" => shown with "(Session)" suffix for clarity
  */
 function semLabel(val) {
   if(!val && val !== 0) return '—';
-  const n = Number(val);
-  if(!isNaN(n) && n > 0 && n <= 8) return 'Semester ' + n;
-  return String(val) + ' (Session)';
+  const s = String(val).trim();
+  if(!s) return '—';
+  // Already ends with "session" — pass through as-is
+  if(s.toLowerCase().endsWith('session')) return s;
+  // Named session: "Odd 2025", "Even 2026" — append " Session"
+  if(/^(odd|even)\s+\d{4}$/i.test(s)) return s + ' Session';
+  // Pure numeric legacy value (e.g. "1", "3") — show as "Session #N" not "1 Session"
+  const n = Number(s);
+  if(!isNaN(n) && n > 0 && String(n) === s) return 'Session #' + n;
+  // Any other string — append Session suffix
+  return s + ' Session';
+}
+
+/**
+ * Convert a session string to a safe image slot name — mirrors backend _sessionToSlot().
+ * "Even 2026" → "payment_ses_even_2026"
+ * "4"         → "payment_ses_4"
+ */
+function sessionToSlot(sessionId) {
+  if(!sessionId) return '';
+  return 'payment_ses_' + String(sessionId).trim().toLowerCase().replace(/[^a-z0-9]+/g,'_');
 }
 
 /**
@@ -2429,7 +2622,7 @@ function nsValidate(step) {
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { showErr('ns-email','Enter valid email address'); ok=false; } else clearErr('ns-email');
     if(!/^\d{6}$/.test(pin)) { showErr('ns-pin','Enter valid 6-digit PIN'); ok=false; } else clearErr('ns-pin');
     const sem = (document.getElementById('ns-semester')?.value || '').trim();
-    if(!sem || sem === '') { showErr('ns-semester','Please select your admission semester'); ok=false; } else { clearErr('ns-semester'); }
+    if(!sem || sem === '') { showErr('ns-semester','Please select your admission session'); ok=false; } else { clearErr('ns-semester'); }
   }
   if(step === 2) {
     // Signature
@@ -2454,7 +2647,7 @@ async function nsSubmit() {
   const _semCheck = (document.getElementById('ns-semester')?.value || '').trim();
   if(!_semCheck) {
     nsGo(1); // go back to step 2
-    showErr('ns-semester','Please select your admission semester');
+    showErr('ns-semester','Please select your admission session');
     return;
   }
   const btn = document.getElementById('ns-submit-btn');
@@ -2474,6 +2667,7 @@ async function nsSubmit() {
     district: document.getElementById('ns-district')?.value,
     pin: getVal('ns-pin'),
     address: toSentenceCase(getVal('ns-address')),
+    admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
     semesterNo: (document.getElementById('ns-semester')?.value || '').trim(),
     accessKey: document.getElementById('ns-access-key')?.value || '',
     photo: uploadedB64['photo'],
@@ -2638,15 +2832,40 @@ function renderStudentProfile() {
   document.getElementById('cs-proll').textContent = s.rollFull || '—';
 
   const badge = document.getElementById('cs-status-badge');
-  const statusLabels = { approved:'Approved', rejected:'Rejected', alumni:'Alumni', provisional:'Provisional', new_pending:'Application Submitted' };
+  const statusLabels = { approved:'Approved', rejected:'Rejected', alumni:'Alumni', provisional:'Provisional', new_pending:'Application Submitted', debarred:'Debarred' };
   badge.textContent = statusLabels[s.status] || 'Pending';
-  badge.className = 'badge badge-' + (s.status==='alumni'?'approved': s.status==='provisional'?'pending': (s.status||'pending'));
+  badge.className = 'badge badge-' + (s.status==='alumni'?'approved': s.status==='provisional'?'pending': s.status==='debarred'?'debarred': (s.status||'pending'));
 
   // Remove previously inserted notices
   const oldRejNotice = document.getElementById('cs-rejection-notice');
   if(oldRejNotice) oldRejNotice.remove();
   const oldProvNotice = document.getElementById('cs-provisional-notice');
   if(oldProvNotice) oldProvNotice.remove();
+  const oldDebarNotice = document.getElementById('cs-debar-notice');
+  if(oldDebarNotice) oldDebarNotice.remove();
+
+  if(s.status === 'debarred') {
+    const dl = getDriveLinks(s);
+    const debarRecords = Array.isArray(dl.debarRecords) ? dl.debarRecords : [];
+    const activeDebars = debarRecords.filter(d=>d.active);
+    const activeSems = activeDebars.flatMap(d=>d.semesters||[]).map(v=>{
+      return semLabel(v);
+    });
+    const notice = document.createElement('div');
+    notice.id = 'cs-debar-notice';
+    notice.innerHTML = `<div class="alert alert-danger" style="margin-top:12px;border-left:4px solid var(--danger)">
+      <strong>🚫 Hostel Debarment Notice</strong>
+      <div style="margin-top:8px;font-size:13px">
+        You have been <strong>debarred from the hostel</strong> for the following semester(s):
+        <strong style="color:var(--danger)">${activeSems.join(', ') || 'N/A'}</strong>
+      </div>
+      <div style="margin-top:6px;font-size:12px;color:var(--gray-600)">
+        ✅ Session fee is <strong>not applicable</strong> for the above session(s).<br/>
+        If you believe this is an error or wish to appeal, please contact the Hostel Warden directly.
+      </div>
+    </div>`;
+    document.getElementById('cs-allot').after(notice);
+  }
 
   if(s.status === 'rejected') {
     const dl = getDriveLinks(s);
@@ -2678,7 +2897,7 @@ function renderStudentProfile() {
         <table style="width:100%;border-collapse:collapse">
           <tr><td style="padding:3px 0;color:var(--gray-600)">Registration Fee</td><td style="text-align:right;font-weight:600">₹500</td></tr>
           <tr><td style="padding:3px 0;color:var(--gray-600)">Caution Money</td><td style="text-align:right;font-weight:600">₹1,500</td></tr>
-          <tr><td style="padding:3px 0;color:var(--gray-600)">Semester Allotment Fee</td><td style="text-align:right;font-weight:600">₹4,500</td></tr>
+          <tr><td style="padding:3px 0;color:var(--gray-600)">Session Allotment Fee</td><td style="text-align:right;font-weight:600">₹4,500</td></tr>
           <tr><td style="padding:3px 0;color:var(--gray-600)">Late Fine (if applicable)</td><td style="text-align:right;font-weight:600;color:var(--danger)">₹50/day</td></tr>
           <tr style="border-top:1px solid var(--gray-200)"><td style="padding-top:5px;font-weight:700">Total Due</td><td style="text-align:right;font-weight:700;color:var(--navy);padding-top:5px">₹6,500</td></tr>
         </table>
@@ -2720,10 +2939,17 @@ function renderStudentProfile() {
   }
 
   // Info grid
+  // FIX: Admission Session — derive from the latest approved semesterFee payment if
+  // available, since admissionSession/semesterNo may hold a legacy numeric value like "1".
+  const _csApprovedSessions = (Array.isArray(s.payments)?s.payments:[])
+    .filter(p => p.status === 'approved' && p.paymentType === 'semesterFee' && p.semester);
+  const _csSessionDisplay = _csApprovedSessions.length
+    ? semLabel(String(_csApprovedSessions[_csApprovedSessions.length-1].semester))
+    : semLabel(s.admissionSession || s.semesterNo || '');
   document.getElementById('cs-info-grid').innerHTML = [
     ['Date of Birth', formatDOB(s.dob)],['Email', s.email],
     ['Contact', s.contactNo],['Guardian Contact', s.guardianContact],
-    ['Guardian', s.guardianName],['Admission Semester', semLabel(s.semesterNo)],
+    ['Guardian', s.guardianName],['Admission Session', _csSessionDisplay],
     ['District / PIN', (s.district||'—')+' — '+( s.pin||'—')],
     ['Permanent Address', (s.address||'—')+(s.district?', '+(s.district||''):'')+(s.pin?', PIN '+(s.pin||''):'')],
     ['Submitted', s.submittedAt ? new Date(s.submittedAt).toLocaleDateString('en-IN') : '—']
@@ -2736,9 +2962,10 @@ function renderStudentProfile() {
   loadStudentProfileImages(s.rollFull);
   renderStudentDocLinks(s);
 
-  // Determine feature lock state (semester lock)
-  const semLocked = isSemesterLocked(s);
-  const isAlumni  = s.status === 'alumni';
+  // Determine feature lock state (semester lock or debarment)
+  const semLocked  = isSemesterLocked(s);
+  const isAlumni   = s.status === 'alumni';
+  const isDebarred = s.status === 'debarred';
 
   // Tab visibility and lock state
   const tabBtnLeave     = document.getElementById('cs-tab-btn-leave');
@@ -2751,6 +2978,20 @@ function renderStudentProfile() {
     document.querySelectorAll('#sec-continuing .tab-btn').forEach((b,i) => {
       if(i > 1) b.style.display = 'none'; else b.style.display = '';
     });
+  } else if(isDebarred) {
+    // Debarred: lock Leave, Update, Grievance tabs entirely
+    [tabBtnLeave, tabBtnUpdate, tabBtnGrievance].forEach(btn => {
+      if(btn) {
+        btn.style.display = '';
+        btn.disabled = true;
+        btn.title = 'Locked — you are debarred from the hostel. Contact the Warden.';
+        btn.style.opacity = '0.4';
+        btn.style.cursor = 'not-allowed';
+      }
+    });
+    if(tabBtnDues) { tabBtnDues.disabled = false; tabBtnDues.style.opacity = ''; tabBtnDues.style.cursor = ''; tabBtnDues.title = ''; }
+    // Redirect away from any restricted tab the student might be on
+    csTab('info');
   } else if(semLocked) {
     // Semester lock: leave, update, grievance are locked
     [tabBtnLeave, tabBtnUpdate, tabBtnGrievance].forEach(btn => {
@@ -2818,16 +3059,18 @@ function isSemesterLocked(student) {
 
   // VACATED-PENDING EXCEPTION: student is pending only because a new semester was
   // activated after they vacated. They should NOT be locked — they are in the process
-  // of getting No Dues and have no current-semester obligation.
+  // of getting No Dues and have no current-session obligation.
   if(student.status === 'pending') {
-    const allApprovedSemNums = payments
+    const approvedSessions = payments
       .filter(p => p.paymentType === 'semesterFee' && p.status === 'approved')
-      .map(p => Number(p.semester)).filter(n => !isNaN(n));
-    if(allApprovedSemNums.length > 0) {
-      const highestApprovedSem = Math.max(...allApprovedSemNums);
+      .map(p => String(p.sessionId||p.semester||'').trim()).filter(s=>s);
+    if(approvedSessions.length > 0) {
       const newSemDues = payments.filter(p =>
-        p.paymentType === 'semesterFee_due' && p.status === 'outstanding' && isNaN(Number(p.semester)));
-      if(newSemDues.length > 0) return false;  // vacated-pending — not locked
+        p.paymentType === 'semesterFee_due' && p.status === 'outstanding');
+      // Vacated-pending: has approved sessions AND a new outstanding due beyond those sessions
+      const newDueSessionIds = newSemDues.map(p => String(p.sessionId||p.semester||'').trim());
+      const isVacated = newDueSessionIds.some(sid => !approvedSessions.includes(sid));
+      if(isVacated) return false;  // vacated-pending — not locked
     }
   }
 
@@ -2868,6 +3111,32 @@ function isSemesterLocked(student) {
 function renderDuesTab() {
   const s = csStudent;
   if(!s) return;
+
+  // Show debarment waiver notice if student is debarred
+  const oldDebarDuesNotice = document.getElementById('cs-debar-dues-notice');
+  if(oldDebarDuesNotice) oldDebarDuesNotice.remove();
+  if(s.status === 'debarred') {
+    const dl = getDriveLinks(s);
+    const debarRecs = Array.isArray(dl.debarRecords) ? dl.debarRecords : [];
+    const waivedSems = debarRecs.filter(d=>d.active).flatMap(d=>d.semesters||[]).map(v=>{
+      return semLabel(v);
+    });
+    const waivedPayments = (Array.isArray(s.payments)?s.payments:[])
+      .filter(p=>p.status==='waived' && p.paymentType==='semesterFee_due');
+    const notice = document.createElement('div');
+    notice.id = 'cs-debar-dues-notice';
+    notice.innerHTML = `<div class="alert" style="background:var(--danger-bg);border-left:4px solid var(--danger);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
+      <strong>🚫 Debarment Active — Session Fee Waived</strong>
+      <div style="margin-top:6px;font-size:13px">
+        You are debarred for: <strong>${waivedSems.join(', ')||'—'}</strong>.<br/>
+        Hostel semester fee is <strong>not applicable</strong> for these semester(s).<br/>
+        <span style="font-size:12px;color:var(--gray-600)">Contact the Hostel Warden if you have any questions regarding your debarment.</span>
+      </div>
+    </div>`;
+    const duesEl = document.getElementById('cs-dues');
+    if(duesEl) duesEl.prepend(notice);
+  }
+
   renderSemLockNotice(s);
   renderOutstandingDues(s);
   renderPaymentHistory(s);
@@ -2895,7 +3164,7 @@ function renderSemLockNotice(s) {
     noticeEl.classList.remove('hidden');
     noticeEl.innerHTML = `
       <div class="alert alert-danger" style="margin-bottom:16px">
-        <strong>🔒 Your account features are temporarily locked for Semester ${semLock.semester}.</strong>
+        <strong>🔒 Your account features are temporarily locked for ${semLabel(semLock.semester)}.</strong>
         <div style="margin-top:8px;font-size:12px;line-height:1.7">
           Leave applications, grievance submissions, and profile updates are disabled until <strong>both</strong> conditions below are met:<br/>
           <strong>${cond1} All outstanding payments verified by Admin Office</strong><br/>
@@ -2918,12 +3187,12 @@ function renderSemLockNotice(s) {
     return new Date().toISOString().split('T')[0] > p.deadline;
   });
   const deadline = overdueDue ? overdueDue.deadline : (s.feeDueDate || '—');
-  const semLabel = overdueDue ? `Semester ${overdueDue.semester}` : 'current semester';
+  const semLockLabel = overdueDue ? semLabel(overdueDue.semester) : 'current session';
 
   noticeEl.classList.remove('hidden');
   noticeEl.innerHTML = `
     <div class="alert alert-danger" style="margin-bottom:16px">
-      <strong>🔒 Your account features are locked — fee payment overdue for ${semLabel}.</strong>
+      <strong>🔒 Your account features are locked — fee payment overdue for ${semLockLabel}.</strong>
       <div style="margin-top:8px;font-size:12px;line-height:1.7">
         The fee payment deadline of <strong>${deadline}</strong> has passed and your payment has not yet been verified.<br/>
         Leave applications, grievance submissions, and profile updates are disabled.<br/>
@@ -2944,24 +3213,60 @@ function renderOutstandingDues(s) {
   // cannot pay for a semester they are not enrolled in. Instead show a notice.
   const allApprovedSemNums = payments
     .filter(p => p.paymentType === 'semesterFee' && p.status === 'approved')
-    .map(p => Number(p.semester)).filter(n => !isNaN(n));
-  const highestApprovedSem = allApprovedSemNums.length ? Math.max(...allApprovedSemNums) : 0;
+    .map(p => String(p.sessionId||p.semester||'').trim()).filter(s=>s);
+  const approvedSessionIds = allApprovedSemNums;  // renamed — these are session strings now
   const newSemDues = payments.filter(p =>
-    p.paymentType === 'semesterFee_due' && p.status === 'outstanding' && isNaN(Number(p.semester)));
-  const isVacatedPending = s.status === 'pending' && newSemDues.length > 0 && highestApprovedSem > 0;
+    p.paymentType === 'semesterFee_due' && p.status === 'outstanding');
+  const newDueSids = newSemDues.map(p => String(p.sessionId||p.semester||'').trim());
+  const isVacatedPending = s.status === 'pending' && newSemDues.length > 0
+    && newDueSids.some(sid => !approvedSessionIds.includes(sid));
 
   if(isVacatedPending) {
-    // Show only a notice — no actionable dues for this student
+    const lastApprovedSession = semLabel(approvedSessionIds[approvedSessionIds.length-1] || '—');
+    const newDueSession       = semLabel(newDueSids[newDueSids.length-1] || '—');
     el.innerHTML = `
-      <div class="alert" style="background:var(--info-bg,#e8f4fd);border:1px solid var(--info,#2196f3);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:8px">
-        <strong>ℹ️ Your Account Is Being Processed for No Dues</strong><br/>
-        <div style="font-size:12px;margin-top:6px;line-height:1.7">
-          A new hostel semester has been activated since you vacated your room. Your account
-          is currently in <strong>Pending</strong> status, but you have <strong>no outstanding
-          fee dues</strong> for your stay up to Semester ${highestApprovedSem}.<br/>
-          Please contact the Warden / Admin Office to initiate your No Dues process.
-          Once issued, your status will be updated to <strong>Alumni</strong>.
+      <div style="margin-bottom:16px">
+
+        <!-- Option 1: Continue — pay for next semester -->
+        <div style="border:1px solid var(--navy);border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px">
+          <div style="background:var(--navy);color:#fff;padding:10px 16px;font-size:13px;font-weight:700">
+            🔄 Option 1 — Continue in Hostel for ${newDueSession}
+          </div>
+          <div style="padding:14px 16px;font-size:13px;color:var(--gray-700);line-height:1.65">
+            A new hostel session (<strong>${newDueSession}</strong>) has been activated.
+            If you wish to <strong>continue staying in the hostel</strong>, you must pay the session
+            allotment fee (₹4,500) before the deadline and submit the receipt for Admin verification.
+            <div style="margin-top:10px;font-size:12px;color:var(--gray-500)">
+              ⚠ Your account is currently in <strong>Pending</strong> status. Features will unlock once
+              your payment is verified and a new Allotment Letter is issued by the Warden.
+            </div>
+          </div>
+          <div style="padding:0 16px 14px">
+            <button class="btn btn-primary btn-sm" onclick="csTab('dues')">
+              💳 Pay ${newDueSession} Fee
+            </button>
+          </div>
         </div>
+
+        <!-- Option 2: Vacate — No Dues path -->
+        <div style="border:1px solid var(--success,#27ae60);border-radius:var(--radius-md);overflow:hidden">
+          <div style="background:var(--success-bg,#e8f8ee);border-bottom:1px solid var(--success,#27ae60);padding:10px 16px;font-size:13px;font-weight:700;color:var(--success,#27ae60)">
+            🏠 Option 2 — Vacate Hostel &amp; Complete No Dues
+          </div>
+          <div style="padding:14px 16px;font-size:13px;color:var(--gray-700);line-height:1.65">
+            <strong>No Dues:</strong> A new hostel session has been activated. Although your account is
+            currently marked as <strong>Pending</strong>, there are <strong>no outstanding fee dues</strong>
+            for your stay up to the <strong>${lastApprovedSession}</strong>.<br/><br/>
+            You are hereby instructed to <strong>vacate your hostel room at the earliest</strong>.
+            Kindly report to the <strong>Warden / Admin Office</strong> to complete the No Dues formalities.
+            Upon successful clearance, your status will be updated to <strong>Alumni</strong>.
+            <div style="margin-top:10px;padding:10px 12px;background:var(--warning-bg,#fffbeb);border:1px solid var(--gold,#f0a500);border-radius:var(--radius-sm);font-size:12px;color:#7a5c00">
+              ⚠ If you have already vacated and are awaiting clearance, please contact the Warden / Admin
+              Office directly. Do <strong>not</strong> pay the new session fee if you are not continuing.
+            </div>
+          </div>
+        </div>
+
       </div>`;
     return;
   }
@@ -3078,7 +3383,7 @@ function renderOutstandingDues(s) {
       const remaining  = Math.max(0, dueAmount - pendingPaid);
       const hasPending = isPendingFor('semesterFee', due.semester);
       items.push({
-        label: `Hostel Allotment Fee — Semester ${due.semester}`,
+        label: `Hostel Allotment Fee — ${semLabel(due.semester)}`,
         amount: dueAmount,
         allocatedPending: hasPending ? pendingPaid : 0,
         note: hasPending
@@ -3094,9 +3399,13 @@ function renderOutstandingDues(s) {
   // 2. For new students (provisional OR pending-after-payment) — show all admission fees
   //    as outstanding until each is individually APPROVED (not just pending/submitted).
   //    PARTIAL PAYMENT FIX: if the amount submitted is less than required, show the balance.
-  if(s.status === 'provisional' || s.status === 'pending') {
-    const semNo = String(s.semesterNo || '1');
-    const alreadyCovered = payments.some(p => p.paymentType === 'semesterFee_due' && String(p.semester) === semNo);
+  //    RENEWAL FIX: skip for renewal students (hostelInfo.roomNo is set) — their session
+  //    fee due is already shown by the semesterFee_due marker loop above, and using
+  //    admissionSession here would show a stale/wrong old session due.
+  const isRenewalStudentDues = !!(s.hostelInfo && s.hostelInfo.roomNo);
+  if((s.status === 'provisional' || s.status === 'pending') && !isRenewalStudentDues) {
+    const semNo = String(s.admissionSession || s.semesterNo || '');
+    const alreadyCovered = payments.some(p => p.paymentType === 'semesterFee_due' && String(p.sessionId||p.semester||'') === semNo);
     if(!alreadyCovered) {
       const semApproved = isApprovedFor('semesterFee', semNo);
       if(!semApproved) {
@@ -3105,7 +3414,7 @@ function renderOutstandingDues(s) {
         const semRemaining   = Math.max(0, semRequired - semPendingPaid);
         const hasSemPending  = isPendingFor('semesterFee', semNo);
         items.push({
-          label: `Hostel Allotment Fee — Semester ${semNo}`,
+          label: `Hostel Allotment Fee — ${semLabel(semNo)}`,
           amount: semRequired,
           allocatedPending: hasSemPending ? semPendingPaid : 0,
           note: hasSemPending
@@ -3120,7 +3429,8 @@ function renderOutstandingDues(s) {
   }
 
   // 3. Registration Fee — outstanding until APPROVED; partial payments shown with balance.
-  const isNewStudent = s.status === 'provisional' || s.status === 'pending';
+  //    Only for genuinely new (non-renewal) students.
+  const isNewStudent = (s.status === 'provisional' || s.status === 'pending') && !isRenewalStudentDues;
   const regApproved = isApprovedFor('registrationFee');
   if(!regApproved && isNewStudent) {
     const regPendingPaid = getAllocatedFor('registrationFee');
@@ -3446,10 +3756,15 @@ function renderPaymentActions(s) {
   // Admission fees for new students — shown when status is 'provisional' OR 'pending'
   // (status becomes 'pending' immediately after payment is submitted, so we must keep
   // showing unpaid items even after the first submission until they are 'approved')
-  const isNewStudentPay = s.status === 'provisional' || s.status === 'pending';
+  // IMPORTANT: Renewal students (existing residents whose status is 'pending' because
+  // initNewSemester was run) must NOT enter this block — their due is already handled
+  // by the semesterFee_due marker loop above, and their admissionSession is the OLD
+  // session. A renewal student always has hostelInfo.roomNo set.
+  const isRenewalStudent = !!(s.hostelInfo && s.hostelInfo.roomNo);
+  const isNewStudentPay = (s.status === 'provisional' || s.status === 'pending') && !isRenewalStudent;
   if(isNewStudentPay) {
     // Semester fee (no semesterFee_due marker needed for new students)
-    const admSem = String(s.semesterNo || '1');
+    const admSem = String(s.admissionSession || s.semesterNo || '');
     const alreadyCovered = payableItems.some(it => it.paymentType === 'semesterFee' && it.semester === admSem);
     if(!alreadyCovered) {
       const existingApproved = payments.find(p => p.paymentType === 'semesterFee'
@@ -3822,7 +4137,7 @@ async function initNewSemester() {
     return;
   }
 
-  const confirmed = confirm(`⚠ This will initialize Semester ${semester} for ALL currently approved students and add an outstanding Hostel Allotment Fee (₹4,500).\n\nFee Payment Deadline: ${deadline}\nAfter this date, a late fine of ₹50/day (max ₹500) will be auto-added.\n\nStudent features (Leave, Grievance, Update) will be locked until all dues are cleared and allotment letters are issued.\n\nDo you want to proceed?`);
+  const confirmed = confirm(`⚠ This will initialize ${semLabel(semester)} for ALL currently approved students and add an outstanding Hostel Allotment Fee (₹4,500).\n\nFee Payment Deadline: ${deadline}\nAfter this date, a late fine of ₹50/day (max ₹500) will be auto-added.\n\nStudent features (Leave, Grievance, Update) will be locked until all dues are cleared and allotment letters are issued.\n\nDo you want to proceed?`);
   if(!confirmed) return;
 
   const btn = document.getElementById('btn-sem-init');
@@ -3831,7 +4146,7 @@ async function initNewSemester() {
 
   const r = await callBackend('initNewSemester', {semester, deadline});
 
-  if(btn) { btn.disabled=false; btn.textContent='🎓 Activate Semester Session'; }
+  if(btn) { btn.disabled=false; btn.textContent='🎓 Activate New Session'; }
 
   if(r.success) {
     if(resultEl) resultEl.innerHTML=`<div class="alert alert-success">✅ ${r.message}</div>`;
@@ -3882,8 +4197,14 @@ async function wardenUnlockStudentAccount() {
 }
 
 function csTab(name) {
-  // Enforce semester lock: block Leave, Update, Grievance if locked
+  // Enforce debarment lock: block Leave, Update, Grievance if debarred
   const restrictedTabs = ['leave','update','grievance'];
+  if(restrictedTabs.includes(name) && csStudent && csStudent.status === 'debarred') {
+    toast('This feature is locked while you are debarred from the hostel. Contact the Warden.', 'error');
+    // Show the debar notice on info tab
+    return; // stay on current tab
+  }
+  // Enforce semester lock: block Leave, Update, Grievance if locked
   if(restrictedTabs.includes(name) && csStudent && isSemesterLocked(csStudent)) {
     toast('This feature is locked. Please clear your outstanding dues first.', 'error');
     renderSemLockNotice(csStudent);
@@ -4002,6 +4323,10 @@ async function loadWardenData(forceReload=false) {
     return;
   }
   wrStudents = r.students || [];
+  // Cache active session from getAllStudents response (if present)
+  if (r.activeSessionId || r.currentSessionId) {
+    window._activeSessionId = r.activeSessionId || r.currentSessionId;
+  }
   wrDataLoaded = true;
   renderWardenStats();
   renderApplicationsList();
@@ -4231,21 +4556,29 @@ function wrFilterStudents() {
     const statusClass = s.status==='alumni'?'badge-approved':'badge-'+(s.status||'pending');
 
     // Derive the highest semester for which payment is approved — this is the
-    // true "approved up to" semester, not the admission semester (semesterNo).
+    // true "approved up to" session, not the admission session (admissionSession).
     const approvedSems = (Array.isArray(s.payments)?s.payments:[])
-      .filter(p=>p.status==='approved')
-      .map(p=>Number(p.semester))
-      .filter(n=>n>0);
-    const maxApprovedSem = approvedSems.length ? Math.max(...approvedSems) : null;
+      .filter(p=>p.status==='approved' && p.paymentType==='semesterFee')
+      .map(p=>String(p.sessionId||p.semester||'').trim())
+      .filter(s=>s);
+    const maxApprovedSem = approvedSems.length ? approvedSems[approvedSems.length-1] : null;
 
     let statusLabel, statusExtra='';
     if(s.status==='alumni') {
       statusLabel = 'Alumni';
+    } else if(s.status==='debarred') {
+      statusLabel = 'debarred';
+      const links = (typeof s.driveLinks === 'object' ? s.driveLinks : {});
+      const dbRecs = Array.isArray(links.debarRecords) ? links.debarRecords : [];
+      const actSems = dbRecs.filter(d=>d.active).flatMap(d=>d.semesters||[]);
+      statusExtra = actSems.length
+        ? `<div style="font-size:10px;color:var(--danger);font-weight:600;margin-top:2px">🚫 ${actSems.map(v=>{const n=Number(v);return(!isNaN(n)&&n>=1&&n<=8)?'Sem '+n:v;}).join(', ')}</div>`
+        : '';
     } else if(s.status==='approved') {
       statusLabel = 'approved';
       statusExtra = maxApprovedSem
         ? `<div style="font-size:10px;color:var(--success);font-weight:600;margin-top:2px">up to Sem ${maxApprovedSem}</div>`
-        : `<div style="font-size:10px;color:var(--gray-400);margin-top:2px">Sem ${s.semesterNo||'1'}</div>`;
+        : `<div style="font-size:10px;color:var(--gray-400);margin-top:2px">${semLabel(s.admissionSession||s.semesterNo||'—')}</div>`;
     } else {
       statusLabel = s.status||'pending';
     }
@@ -4289,13 +4622,13 @@ function wrFilterStudents() {
 }
 
 function wrTab(name) {
-  ['applications','students','fines','leaves','grievances','nodues','letters','unlock','datesettings','reports'].forEach(t=>{
+  ['applications','students','fines','leaves','grievances','nodues','letters','unlock','datesettings','reports','debar'].forEach(t=>{
     const el = document.getElementById('wr-tab-'+t);
     if(el) el.classList.toggle('hidden', t!==name);
     if(el) el.style.display = (t!==name) ? 'none' : '';
   });
   document.querySelectorAll('#wr-dashboard .tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active', ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports'][i]===name);
+    b.classList.toggle('active', ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','debar'][i]===name);
   });
   // Reload data for each tab switch
   if(name==='applications') {
@@ -4311,7 +4644,8 @@ function wrTab(name) {
   else if(name==='nodues') { document.getElementById('nd-result').classList.add('hidden'); }
   else if(name==='letters') renderWardenLetters();
   else if(name==='datesettings') loadDateWindows();
-  else if(name==='reports') { /* data loaded on demand via Load buttons */ }
+  else if(name==='reports') { /* data loaded on demand via Load buttons — Report 3 shares getDebars cache */ }
+  else if(name==='debar') { loadDebarTab(); }
   else if(name==='unlock') {
     document.getElementById('wr-unlock-email').value='';
     document.getElementById('wr-unlock-masterkey').value='';
@@ -4353,6 +4687,21 @@ async function openApprove(rollFull, viewOnly=false) {
   // ViewOnly / Renewal: hide form (renewal has its own panel)
   if(allotForm) allotForm.style.display = (viewOnly || isRenewal || isProvisional || isNewStudent) ? 'none' : 'block';
 
+  // Show quick debar section only for approved/pending students (not new_pending or provisional)
+  const quickDebarSection = document.getElementById('wr-quick-debar-section');
+  if(quickDebarSection) {
+    const showDebar = ['approved','pending','debarred'].includes(s.status);
+    quickDebarSection.style.display = showDebar ? 'block' : 'none';
+    // If already debarred, change label
+    if(s.status === 'debarred') {
+      quickDebarSection.querySelector('.section-heading').textContent = '🚫 Debarment Active';
+      quickDebarSection.querySelector('.btn').textContent = '⚙ Manage Debarment Records';
+    } else {
+      quickDebarSection.querySelector('.section-heading').textContent = '🚫 Debar from Hostel';
+      quickDebarSection.querySelector('.btn').textContent = '🚫 Go to Debar Students Tab';
+    }
+  }
+
   // Update approve button text and action based on student type
   const approveBtn = document.getElementById('wr-approve-btn');
   if(approveBtn) {
@@ -4383,7 +4732,7 @@ async function openApprove(rollFull, viewOnly=false) {
     renewalDiv.id = 'wr-renewal-panel';
     renewalDiv.innerHTML = `
       <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
-      <div class="section-heading" style="color:var(--info)">🔄 ${semLabel(s.renewalSemester)} Renewal — Issue New Allotment Letter</div>
+      <div class="section-heading" style="color:var(--info)">🔄 ${semLabel(s.renewalSemester)} — Issue New Allotment Letter</div>
       <div class="alert alert-info" style="margin-bottom:14px;font-size:13px">
         This is a <strong>renewal request</strong> for ${semLabel(s.renewalSemester)}.
         The student's existing room allocation is shown below. Verify the receipt above, then confirm to issue the new allotment letter.
@@ -4420,7 +4769,7 @@ async function openApprove(rollFull, viewOnly=false) {
           <div class="err-msg hidden" id="err-wr-renewal-table"></div>
         </div>
       </div>
-      <button class="btn btn-gold" id="wr-renewal-btn" onclick="approveRenewal('${s.rollFull}', ${s.renewalSemester})">
+      <button class="btn btn-gold" id="wr-renewal-btn" onclick="approveRenewal('${s.rollFull}', '${s.renewalSemester}')">
         🔄 Approve Renewal &amp; Issue Allotment Letter (${semLabel(s.renewalSemester)})
       </button>`;
     document.getElementById('wr-allot-form').after(renewalDiv);
@@ -4545,7 +4894,14 @@ async function openApprove(rollFull, viewOnly=false) {
     ['Contact',s.contactNo],['Guardian',s.guardianName],['G.Contact',s.guardianContact],
     ['District / PIN',(s.district||'—')+' — '+(s.pin||'—')],
     ['Permanent Address',(s.address||'—')+(s.district?', '+s.district:'')+(s.pin?', PIN '+s.pin:'')],
-    ['Semester',(()=>{const ap=(Array.isArray(s.payments)?s.payments:[]).filter(p=>p.status==='approved').map(p=>Number(p.semester)).filter(n=>n>0);return ap.length?String(Math.max(...ap)):s.semesterNo;})()]
+    ['Session',(()=>{
+      const ap=(Array.isArray(s.payments)?s.payments:[])
+        .filter(p=>p.status==='approved' && p.paymentType==='semesterFee' && p.semester)
+        .map(p=>String(p.semester));
+      if(ap.length) return semLabel(ap[ap.length-1]);
+      const raw=s.admissionSession||s.semesterNo||'';
+      return raw ? semLabel(raw) : '—';
+    })()]
   ];
   document.getElementById('wr-approve-info').innerHTML = infoRows
     .map(([k,v])=>`<div class="info-item"><div class="key">${k}</div><div class="val">${v||'—'}</div></div>`).join('');
@@ -4633,6 +4989,25 @@ async function openApprove(rollFull, viewOnly=false) {
       return p.paymentType;
     };
     const verifiablePays = payments.filter(p => p.paymentType !== 'semesterFee_due');
+
+    // Build a receipt-number → correct image slot map.
+    // Mirrors backend: semester fee slot takes priority (image saved there for consolidated payments).
+    // Uses sessionToSlot() so "Even 2026" → "payment_ses_even_2026".
+    const receiptSlotMap = {};
+    verifiablePays.forEach(p => {
+      const key = p.receipt ? String(p.receipt).trim() : '';
+      if(!key) return;
+      if(!receiptSlotMap[key]) {
+        receiptSlotMap[key] = p.paymentType === 'registrationFee' ? 'regFeeImage'
+                            : p.paymentType === 'cautionMoney'    ? 'cautionFeeImage'
+                            : p.semester ? sessionToSlot(p.semester) : '';
+      }
+      // Semester fee slot overrides (highest priority — where image is actually saved)
+      if(p.paymentType === 'semesterFee' && p.semester) {
+        receiptSlotMap[key] = sessionToSlot(p.semester);
+      }
+    });
+
     const allPaymentsHtml = verifiablePays.length === 0
       ? '<p style="color:var(--danger);font-size:13px;padding:8px 0">⚠ No fee payments on record. Student must submit payment details.</p>'
       : verifiablePays.map((p,i) => {
@@ -4640,9 +5015,13 @@ async function openApprove(rollFull, viewOnly=false) {
         const isRejected = p.status === 'rejected';
         const typeLabel = payTypeLabel(p);
         if(!typeLabel) return '';
-        const imgSlot = p.paymentType === 'registrationFee' ? 'regFeeImage'
-                      : p.paymentType === 'cautionMoney' ? 'cautionFeeImage'
-                      : p.semester ? 'payment_sem_'+p.semester : '';
+        // Use consolidated-receipt-aware slot with session-safe names
+        const receiptKey = p.receipt ? String(p.receipt).trim() : '';
+        const imgSlot = receiptKey && receiptSlotMap[receiptKey]
+                      ? receiptSlotMap[receiptKey]
+                      : p.paymentType === 'registrationFee' ? 'regFeeImage'
+                      : p.paymentType === 'cautionMoney'    ? 'cautionFeeImage'
+                      : p.semester ? sessionToSlot(p.semester) : '';
         return `
           <div style="padding:10px 0;border-bottom:1px solid var(--gray-100);${isRejected?'background:var(--danger-bg);padding:10px;border-radius:var(--radius-sm);margin-bottom:6px':''}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
@@ -4785,6 +5164,11 @@ async function openApprove(rollFull, viewOnly=false) {
         onclick="openImageModal('data:image/jpeg;base64,${profR.signature}','Signature')"/>
       <div style="font-size:11px;color:var(--gray-600);margin-top:4px;font-weight:600">Signature</div>
     </div>`;
+  } else {
+    imgHtml += `<div style="text-align:center;width:160px">
+      <div style="width:160px;height:70px;background:var(--gray-50);border:1px dashed var(--gray-200);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-400)">No Signature</div>
+      <div style="font-size:11px;color:var(--gray-600);margin-top:4px;font-weight:600">Signature</div>
+    </div>`;
   }
   imgHtml += '</div>';
 
@@ -4792,11 +5176,32 @@ async function openApprove(rollFull, viewOnly=false) {
   if(!isNewStudent) {
     imgHtml += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--gray-600);margin-bottom:8px">Fee Receipts (click to load)</div>';
     imgHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    // One-time fee slots (reg + caution)
     const receiptSlots = [
       {type:'regFeeImage',     label:'Reg. Fee'},
-      {type:'cautionFeeImage', label:'Caution Money'},
-      {type:'allotFeeImage',   label:'Allotment Fee'}
+      {type:'cautionFeeImage', label:'Caution Money'}
     ];
+    // Add dynamic session-keyed allotment fee slots from actual payments (deduped by slot).
+    // FIXED: no longer add a static allotFeeImage button here — it would show "No image"
+    // for legacy records. Instead derive slots from semesterFee payment records and
+    // show a fallback allotFeeImage button only when no session records exist.
+    const payments = Array.isArray(s.payments) ? s.payments : [];
+    const seenSlots = new Set(receiptSlots.map(r => r.type));
+    let hasSessionSlots = false;
+    payments
+      .filter(p => p.paymentType === 'semesterFee' && p.semester)
+      .forEach(p => {
+        const slot = sessionToSlot(p.semester);
+        if(!seenSlots.has(slot)) {
+          seenSlots.add(slot);
+          receiptSlots.push({type: slot, label: semLabel(p.semester)});
+          hasSessionSlots = true;
+        }
+      });
+    // Legacy fallback: if no session payment records exist, show allotFeeImage slot
+    if(!hasSessionSlots) {
+      receiptSlots.push({type:'allotFeeImage', label:'Allotment Fee'});
+    }
     receiptSlots.forEach(({type,label}) => {
       imgHtml += `<div id="wrimgslot-${safeRollImg}-${type}" style="display:inline-block">
         <button class="btn btn-secondary btn-sm" style="font-size:11px"
@@ -4959,6 +5364,8 @@ async function loadDateWindows() {
 
   // ── Panel 3: New Semester ─────────────────────────────────────────────────
   const p3 = r.newSemester || {};
+  // Cache active session globally for session pickers (admission form, debar form)
+  if (p3.sessionId) window._activeSessionId = p3.sessionId;
   const s3 = document.getElementById('dw-newsemester-start');
   const e3 = document.getElementById('dw-newsemester-end');
   if(s3) s3.value = p3.start || '';
@@ -5117,7 +5524,7 @@ async function recalcSemFines() {
   if(res) res.innerHTML='<span class="spinner spinner-dark"></span>';
   const r = await callBackend('calcLateFines', { type:'semester' });
   if(res) res.innerHTML = r.success
-    ? '<span style="color:var(--success)">✅ Semester late fines recalculated.</span>'
+    ? '<span style="color:var(--success)">✅ Session late fines recalculated.</span>'
     : `<span style="color:var(--danger)">⚠ ${r.error||'Failed'}</span>`;
   if(r.success) { loadDateWindows(); setTimeout(()=>{ if(res) res.innerHTML=''; },5000); }
 }
@@ -5151,7 +5558,7 @@ function updateSessionPreview() {
   }
 }
 
-// ── New Semester Activation v2 (Panel 3) ──────────────────────────────────
+// ── New Session Activation v2 (Panel 3) ──────────────────────────────────
 async function initNewSemesterV2() {
   const semType      = document.getElementById('sem-type-select')?.value.trim();
   const semYear      = document.getElementById('sem-year-select')?.value.trim();
@@ -5174,7 +5581,7 @@ async function initNewSemesterV2() {
   const deadline     = deadlineDate.toISOString().split('T')[0];
 
   const confirmed = confirm(
-    `⚠ SEMESTER SESSION ACTIVATION\n\n` +
+    `⚠ SESSION ACTIVATION\n\n` +
     `Session:          ${sessionId}\n` +
     `Session Start:    ${_fmtDate(sessionStart)}\n` +
     `Payment Deadline: ${_fmtDate(deadline)} (auto: +10 days)\n\n` +
@@ -5204,7 +5611,7 @@ async function initNewSemesterV2() {
     deadline
   });
 
-  if(btn) { btn.disabled=false; btn.innerHTML='🎓 Activate Semester Session'; }
+  if(btn) { btn.disabled=false; btn.innerHTML='🎓 Activate New Session'; }
 
   if(r.success) {
     if(resultEl) resultEl.innerHTML=`<div class="alert alert-success">✅ ${r.message||'Session activated successfully.'}</div>`;
@@ -5353,12 +5760,12 @@ async function approveRenewal(rollFull, renewalSem) {
     rollFull, hostelInfo, refNo,
     wardenEmail: 'gpmungerhostel@gmail.com'
   });
-  btn.disabled=false; btn.innerHTML=`🔄 Approve Renewal & Issue Allotment Letter (Sem ${renewalSem})`;
+  btn.disabled=false; btn.innerHTML=`🔄 Approve Renewal & Issue Allotment Letter (${semLabel(renewalSem)})`;
 
   if(r.success) {
-    toast(`Semester ${renewalSem} renewal approved! Allotment letter issued. Ref: ${refNo}`, 'success');
+    toast(`${semLabel(renewalSem)} renewal approved! Allotment letter issued. Ref: ${refNo}`, 'success');
     const idx = wrStudents.findIndex(x=>x.rollFull===rollFull);
-    if(idx>=0) { wrStudents[idx].status='approved'; wrStudents[idx].hostelInfo=hostelInfo; wrStudents[idx].renewalSemester=''; wrStudents[idx].semesterNo=String(renewalSem); }
+    if(idx>=0) { wrStudents[idx].status='approved'; wrStudents[idx].hostelInfo=hostelInfo; wrStudents[idx].renewalSemester=''; wrStudents[idx].admissionSession=String(renewalSem); wrStudents[idx].semesterNo=String(renewalSem); }
     wrCloseApprove();
     renderWardenStats();
     renderApplicationsList();
@@ -5397,39 +5804,40 @@ async function rejectApplication() {
   }
 }
 
-// ── LOAD PAYMENT RECEIPT IMAGE — FIX #2: uses getOneImage (single Drive file) ──
+// ── LOAD PAYMENT RECEIPT IMAGE ──────────────────────────────────────────────
+// slotOrSemester: session slot "payment_ses_even_2026", legacy "payment_sem_1",
+//                 type name "regFeeImage", or raw session string "Even 2026".
 async function loadPaymentReceiptImage(rollFull, slotOrSemester, containerId) {
   const container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '<span style="font-size:12px;color:var(--gray-400)">Loading image…</span>';
-  // slotOrSemester can be a string slot name like "payment_sem_1", "regFeeImage",
-  // "cautionFeeImage", or a numeric semester number (legacy).
-  const isSlotName = typeof slotOrSemester === 'string' && isNaN(Number(slotOrSemester));
-  let b64 = null;
-  if(isSlotName) {
-    const imgR = await callBackend('getOneImage', {rollFull, type: slotOrSemester});
-    b64 = (imgR.success && imgR.image) ? imgR.image : null;
-    // fallback for allotFeeImage → payment_sem_1
-    if(!b64 && slotOrSemester.startsWith('payment_sem_')) {
-      const fb = await callBackend('getOneImage', {rollFull, type:'allotFeeImage'});
-      b64 = (fb.success && fb.image) ? fb.image : null;
-    }
-  } else {
-    // Legacy: semester number
-    const semester = slotOrSemester;
-    let imgR = await callBackend('getOneImage', {rollFull, type:'payment_sem_'+semester});
-    b64 = (imgR.success && imgR.image) ? imgR.image : null;
-    if(!b64) {
-      const fb = await callBackend('getOneImage', {rollFull, type:'allotFeeImage'});
-      b64 = (fb.success && fb.image) ? fb.image : null;
-    }
+
+  // Normalise slot name — convert legacy/raw forms to canonical session slot
+  let slot = String(slotOrSemester||'').trim();
+  if(slot.startsWith('payment_sem_')) {
+    const part = slot.replace('payment_sem_','');
+    if(isNaN(Number(part))) slot = sessionToSlot(part); // "payment_sem_Even 2026" → "payment_ses_even_2026"
+    // numeric "payment_sem_1" stays as-is (legacy record)
+  } else if(!slot.startsWith('payment_ses_') && !['regFeeImage','cautionFeeImage','allotFeeImage','photo','signature'].includes(slot)) {
+    const num = Number(slot);
+    slot = isNaN(num) ? sessionToSlot(slot) : 'payment_sem_' + num;
   }
+
+  let b64 = null;
+  const r1 = await callBackend('getOneImage', {rollFull, type: slot});
+  b64 = (r1.success && r1.image) ? r1.image : null;
+
+  // Fallback: legacy allotFeeImage slot, or for reg/caution consolidated payments
+  if(!b64) {
+    const fb = await callBackend('getOneImage', {rollFull, type:'allotFeeImage'});
+    b64 = (fb.success && fb.image) ? fb.image : null;
+  }
+
   if(b64) {
-    const label = typeof slotOrSemester === 'string' ? slotOrSemester : 'Semester '+slotOrSemester;
     container.innerHTML = `
-      <img src="data:image/jpeg;base64,${b64}" alt="Receipt ${label}"
+      <img src="data:image/jpeg;base64,${b64}" alt="Receipt"
         style="max-width:200px;max-height:150px;object-fit:contain;border:1px solid var(--gray-200);border-radius:var(--radius-md);cursor:pointer;margin-top:6px"
-        onclick="openImageModal('data:image/jpeg;base64,${b64}','${label} Receipt')"/>
+        onclick="openImageModal('data:image/jpeg;base64,${b64}','Payment Receipt')"/>
       <div style="font-size:10px;color:var(--gray-600);margin-top:3px">Click to enlarge</div>`;
   } else {
     container.innerHTML = '<span style="font-size:12px;color:var(--gray-400)">No image found for this receipt.</span>';
@@ -5442,11 +5850,17 @@ async function loadOneImageSlot(rollFull, type, slotId, label) {
   if(!slot) return;
   slot.innerHTML = '<span style="font-size:11px;color:var(--gray-400)"><span class="spinner spinner-dark"></span> Loading…</span>';
   const r = await callBackend('getOneImage', {rollFull, type});
-  if(r.success && r.image) {
+  let b64 = (r.success && r.image) ? r.image : null;
+  // For session-keyed slots: fall back to allotFeeImage (covers pre-fix legacy records)
+  if(!b64 && type.startsWith('payment_ses_')) {
+    const fb = await callBackend('getOneImage', {rollFull, type:'allotFeeImage'});
+    b64 = (fb.success && fb.image) ? fb.image : null;
+  }
+  if(b64) {
     slot.innerHTML = `<div style="text-align:center">
-      <img src="data:image/jpeg;base64,${r.image}" alt="${label}"
+      <img src="data:image/jpeg;base64,${b64}" alt="${label}"
         style="max-width:180px;max-height:140px;object-fit:contain;border:1px solid var(--gray-200);border-radius:var(--radius-md);cursor:pointer;background:#fff;margin-top:4px"
-        onclick="openImageModal('data:image/jpeg;base64,${r.image}','${label}')"/>
+        onclick="openImageModal('data:image/jpeg;base64,${b64}','${label}')"/>
       <div style="font-size:10px;color:var(--gray-600);margin-top:3px;font-weight:600">${label}</div>
       <div style="font-size:10px;color:var(--gray-400)">Click to enlarge</div>
     </div>`;
@@ -5723,7 +6137,7 @@ function renderNoDuesResult(s) {
       <div>
         <div style="font-weight:600;font-size:16px;color:var(--navy)">${s.name}</div>
         <div style="font-size:13px;color:var(--gray-600)">${s.rollFull} · ${s.email}</div>
-        <div style="font-size:12px;color:var(--gray-400)">Admitted: Semester ${s.semesterNo||'1'} · Approved: ${s.status==='approved'||s.status==='alumni'?'Yes':'No'}</div>
+        <div style="font-size:12px;color:var(--gray-400)">Admitted: ${semLabel(s.admissionSession||s.semesterNo||'—')} · Approved: ${s.status==='approved'||s.status==='alumni'?'Yes':'No'}</div>
       </div>
       <span class="badge badge-${s.status==='alumni'?'approved':s.status||'pending'}" style="margin-left:auto">${statusLabel}</span>
     </div>`;
@@ -5741,20 +6155,54 @@ function renderNoDuesResult(s) {
         🎓 This student is already an <strong>Alumni</strong>. No Dues was previously issued (Ref: <strong>${s.noDuesRef||'—'}</strong>).
         ${docBtns ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${docBtns}</div>` : '<div style="font-size:12px;color:var(--gray-400);margin-top:6px">No document links found. Check Drive folder.</div>'}
       </div>`;
-    // Hide the semester selector — not needed
+    // Hide the session selector — not needed
     const semField = document.querySelector('#nd-result .field');
     if(semField) semField.style.display='none';
     resultDiv.classList.remove('hidden');
     return;
   }
 
-  // Show semester selector for non-alumni
+  // Show session selector for non-alumni, populated from student's payment history
   const semField = document.querySelector('#nd-result .field');
   if(semField) semField.style.display='';
+
+  // Populate session options from student's approved + outstanding session payments.
+  // IMPORTANT: exclude legacy numeric session IDs (e.g. "1") — they are not real
+  // named sessions; actual payments all use "Even 2026", "Odd 2026" etc.
+  // Do NOT add admissionSession as a fallback — it may hold a legacy numeric value.
+  const ndSemSel = document.getElementById('nd-sem-select');
+  if(ndSemSel) {
+    const payments = Array.isArray(s.payments) ? s.payments : [];
+    const seen = new Set();
+    const opts = [];
+    payments.forEach(p => {
+      if(p.paymentType !== 'semesterFee' && p.paymentType !== 'semesterFee_due') return;
+      const sid = String(p.sessionId || p.semester || '').trim();
+      if(!sid || seen.has(sid)) return;
+      // Skip legacy numeric values — not real named sessions
+      const asNum = Number(sid);
+      if(!isNaN(asNum) && String(asNum) === sid) return;
+      seen.add(sid);
+      opts.push(sid);
+    });
+    // Sort: Even before Odd within same year (Even 2026 → Odd 2026 → Even 2027 …)
+    opts.sort((a,b) => {
+      const parse = v => {
+        const parts = String(v).trim().split(/\s+/);
+        const yr   = parseInt(parts[1]) || 0;
+        const half = /^even$/i.test(parts[0]) ? 0 : 1;
+        return yr * 2 + half;
+      };
+      return parse(a) - parse(b);
+    });
+    ndSemSel.innerHTML = '<option value="">— Select session —</option>' +
+      opts.map(sid => `<option value="${sid}">${semLabel(sid)}</option>`).join('');
+  }
+
   setVal('nd-sem-select','');
   document.getElementById('nd-dues-checks').innerHTML='';
   document.getElementById('nd-fee-table').innerHTML='';
-  // Pre-check details are shown inside recalcDues() once a semester is selected
+  // Pre-check details are shown inside recalcDues() once a session is selected
   document.getElementById('nd-issue-wrap').innerHTML='';
   resultDiv.classList.remove('hidden');
 }
@@ -5762,7 +6210,7 @@ function renderNoDuesResult(s) {
 async function recalcDues() {
   const s = _ndStudent;
   if(!s) return;
-  const selSem = parseInt(document.getElementById('nd-sem-select')?.value||'0');
+  const selSem = (document.getElementById('nd-sem-select')?.value||'').trim();
   if(!selSem) {
     document.getElementById('nd-dues-checks').innerHTML='';
     document.getElementById('nd-fee-table').innerHTML='';
@@ -5775,8 +6223,8 @@ async function recalcDues() {
 
   // ── Determine if student is "effectively approved" for No Dues purposes ──────
   // A student may be in 'pending' status ONLY because initNewSemester activated a new
-  // semester AFTER they vacated. If the selected No Dues semester is BEFORE that new
-  // semester lock, the student is financially clear up to that point and we should
+  // semester AFTER they vacated. If the selected No Dues session is BEFORE that new
+  // session lock, the student is financially clear up to that point and we should
   // treat them as approved for this calculation.
   //
   // We detect this by checking: is the ONLY reason for pending status a semesterFee_due
@@ -5786,67 +6234,104 @@ async function recalcDues() {
   // all the student's approved semester payments.
   const allApprovedSemNums = payments
     .filter(p => p.paymentType === 'semesterFee' && p.status === 'approved')
-    .map(p => Number(p.semester))
-    .filter(n => !isNaN(n));
-  const highestApprovedSem = allApprovedSemNums.length ? Math.max(...allApprovedSemNums) : 0;
+    .map(p => String(p.sessionId||p.semester||'').trim()).filter(s=>s);
+  const approvedSessionsArr = allApprovedSemNums;  // session strings
 
-  // A pending-only-due-to-new-semester student: status is 'pending', has a semesterFee_due
-  // with a non-numeric semester (session ID style), and that due was added after their last
-  // numeric-semester payment. If selSem <= highestApprovedSem, the new semester lock is irrelevant.
+  // A pending-only-due-to-new-session student: status is 'pending', has a semesterFee_due
+  // for a session they haven't paid yet, added after their last approved session.
+  // If selSem is already in their approved sessions, the new session lock is irrelevant.
   const newSemDues = payments.filter(p =>
     p.paymentType === 'semesterFee_due' &&
-    p.status === 'outstanding' &&
-    isNaN(Number(p.semester))   // session-style IDs like "Odd 2026" are non-numeric
+    p.status === 'outstanding'
   );
+  // "vacated pending": student is pending only because a NEW session was activated
+  // after they paid for all their sessions — the No Dues session they selected is already paid
+  const approvedSessionIds = payments
+    .filter(p => p.paymentType === 'semesterFee' && p.status === 'approved')
+    .map(p => String(p.sessionId||p.semester||'').trim()).filter(s=>s);
   const pendingOnlyDueToNewSem = s.status === 'pending'
     && newSemDues.length > 0
-    && selSem <= highestApprovedSem;
+    && approvedSessionIds.includes(selSem);
 
   const isApproved = s.status === 'approved' || pendingOnlyDueToNewSem;
 
-  const admissionSem  = parseInt(s.semesterNo||'1');
-  const semCount      = Math.max(0, selSem - admissionSem + 1);
+  // ── Financial calculation — session-string aware ──────────────────────────────
+  // Sessions are strings like "Even 2026", "Odd 2026". Order: Even before Odd within
+  // the same year (Even 2026 → Odd 2026 → Even 2027 → Odd 2027 …).
+  //
+  // CRITICAL FIXES vs previous version:
+  // 1. admissionSession may hold a legacy numeric value like "1". This is NOT a real
+  //    separate session — it was used before the system switched to named sessions.
+  //    We MUST NOT add it to allSessionIds as a session to be paid, because no
+  //    semesterFee payment will ever have semester="1" (they all use "Even 2026" etc.).
+  //    Doing so inflated totalRequired by ₹4,500 and showed a false ₹4,500 remaining.
+  // 2. Even comes BEFORE Odd within the same year (not after).
+
+  // Correct chronological comparator: Even=0, Odd=1 within same year
+  function _sessOrder(v) {
+    const n = Number(String(v).trim());
+    if(!isNaN(n) && n > 0) return n * 2 - 1; // legacy numeric: very early order, before named sessions
+    const parts = String(v).trim().split(/\s+/);
+    const yr   = parseInt(parts[1]) || 0;
+    const half = /^even$/i.test(parts[0]) ? 0 : 1; // Even first, Odd second
+    return yr * 2 + half;
+  }
+
+  // Build ONLY named session IDs from actual semesterFee payment records (approved or pending).
+  // Exclude legacy numeric values — they are NOT real separate sessions to be paid.
+  const allSessionIds = [];
+  const _seenSess = new Set();
+  payments.forEach(p => {
+    if(p.paymentType !== 'semesterFee' && p.paymentType !== 'semesterFee_due') return;
+    if(!p.semester) return;
+    const sid = String(p.semester).trim();
+    // Skip legacy numeric session IDs — they are aliases, not real separate sessions
+    const asNum = Number(sid);
+    if(!isNaN(asNum) && String(asNum) === sid) return;
+    if(sid && !_seenSess.has(sid)) { _seenSess.add(sid); allSessionIds.push(sid); }
+  });
+
+  // Sort named sessions: Even before Odd within same year, years ascending
+  allSessionIds.sort((a, b) => _sessOrder(a) - _sessOrder(b));
+
+  // Sessions up to and including selSem
+  const selSemIdx = allSessionIds.indexOf(selSem);
+  const sessionsUpToSel = selSemIdx >= 0
+    ? allSessionIds.slice(0, selSemIdx + 1)
+    : (allSessionIds.length > 0 ? allSessionIds : [selSem]); // fallback
+
+  // Fee amounts
+  const semCount      = sessionsUpToSel.length || 1;
   const regFee        = 500;
   const cautionMoney  = 1500;
   const allotPerSem   = 4500;
   const totalAllot    = allotPerSem * semCount;
   const totalRequired = regFee + cautionMoney + totalAllot;
 
-  // ── Match payments by numeric semester only (ignore session-string IDs like "Odd 2026") ──
-  // session-style semesterFee_due markers are EXCLUDED — they represent future semesters
-  // beyond the selected No Dues semester and must not affect the balance calculation.
-  // FIXED: only count semesterFee approved payments for semester count.
-  // Old code filtered all approved payments (including registrationFee, cautionMoney entries)
-  // which inflated approvedPayments.length and made totalPaid far exceed totalRequired,
-  // causing feeBalance=0 even when semester fees were genuinely unpaid.
-  const approvedPayments = payments.filter(p => {
-    if(p.paymentType !== 'semesterFee') return false; // only actual semester fee payments
-    const semNum = Number(p.semester);
-    if(isNaN(semNum)) return false;     // skip non-numeric session IDs
-    return p.status === 'approved' && semNum >= admissionSem && semNum <= selSem;
-  });
-  const totalPaid = (regFee + cautionMoney) + (approvedPayments.length * allotPerSem);
-  const pendingPayments = payments.filter(p => {
-    if(p.paymentType !== 'semesterFee') return false; // only actual semester fee payments
-    const semNum = Number(p.semester);
-    if(isNaN(semNum)) return false;
-    return p.status === 'pending' && semNum >= admissionSem && semNum <= selSem;
-  }).length;
+  // Approved and pending semesterFee payments within sessionsUpToSel
+  const approvedPayments = payments.filter(p =>
+    p.paymentType === 'semesterFee' && p.status === 'approved' &&
+    p.semester && sessionsUpToSel.includes(String(p.semester).trim()));
+  const pendingPayments = payments.filter(p =>
+    p.paymentType === 'semesterFee' && p.status === 'pending' &&
+    p.semester && sessionsUpToSel.includes(String(p.semester).trim())).length;
 
-  // ── Only count fines that are relevant to semesters up to selSem ──────────────
-  // Exclude fines created by initNewSemester late-fee logic for sessions after the student vacated.
-  // A fine is "post-vacating" if it was auto-generated for a session semester after selSem.
-  // We identify these as system-generated late fines for sessions after the student's last payment.
+  // Registration and caution: paid if at least one approved entry exists
+  const regPaid     = payments.some(p => p.paymentType === 'registrationFee' && p.status === 'approved');
+  const cautionPaid = payments.some(p => p.paymentType === 'cautionMoney'    && p.status === 'approved');
+
+  const totalPaid  = (regPaid ? regFee : 0) + (cautionPaid ? cautionMoney : 0) + (approvedPayments.length * allotPerSem);
+  const feeBalance = Math.max(0, totalRequired - totalPaid);
+
+  // ── Only count fines that are relevant to sessions up to selSem ─────────────
   const totalFine = fines.reduce((a,f) => {
     if(f.revoked || f.paid) return a;
-    // If this is a system-generated late fine for a session AFTER the selected semester, exclude it
+    // Exclude system-generated late fines for sessions AFTER the selected session
     if(f.isSystemGenerated && f.fineCategory === 'semester' && f.sessionSemester) {
-      const fnSemNum = Number(f.sessionSemester);
-      if(isNaN(fnSemNum) || fnSemNum > selSem) return a; // skip post-vacating session fines
+      if(!sessionsUpToSel.includes(String(f.sessionSemester).trim())) return a;
     }
     return a + Number(f.amount||0);
   }, 0);
-  const feeBalance = Math.max(0, totalRequired - totalPaid);
   const financiallyClear = isApproved && feeBalance===0 && totalFine===0;
 
   // ── Pre-check result for this student ──
@@ -5864,12 +6349,12 @@ async function recalcDues() {
   // to know this is expected and does NOT block No Dues issuance.
   const vacatedBanner = pendingOnlyDueToNewSem ? `
     <div class="alert alert-warning" style="margin-bottom:12px;font-size:12px">
-      <strong>ℹ️ Heads up — New Semester Activated After Student Vacated</strong><br/>
+      <strong>ℹ️ Heads up — New Session Activated After Student Vacated</strong><br/>
       This student's account shows <strong>Pending</strong> status because the system activated
       a new semester (<em>${newSemDues.map(d=>d.semester).join(', ')}</em>) after they had already
       stopped residing. That new-semester fee is <strong>not counted</strong> against No Dues for
-      Semester ${selSem} — it has been excluded from the balance below.<br/>
-      <span style="color:var(--success);font-weight:600">✓ No Dues can be issued for Semester ${selSem} if all other checks pass.</span>
+      ${semLabel(selSem)} — it has been excluded from the balance below.<br/>
+      <span style="color:var(--success);font-weight:600">✓ No Dues can be issued for ${semLabel(selSem)} if all other checks pass.</span>
     </div>` : '';
 
   // ── Status checks row ──
@@ -5879,7 +6364,7 @@ async function recalcDues() {
       <span>${isApproved ? (pendingOnlyDueToNewSem ? '✓ Eligible (pending due to new semester only)' : '✓ Approved') : '✗ Pending approval'}</span>
     </div>
     <div class="dues-check-row ${feeBalance===0?'dues-ok':'dues-bad'}">
-      <span>Allotment Fee (Semester ${admissionSem} – Semester ${selSem})</span>
+      <span>Allotment Fee (${semLabel(sessionsUpToSel[0]||selSem)} – ${semLabel(selSem)})</span>
       <span>${feeBalance===0?'✓ Cleared':'✗ ₹'+feeBalance+' pending'}</span>
     </div>
     <div class="dues-check-row ${totalFine===0?'dues-ok':'dues-bad'}">
@@ -5893,22 +6378,21 @@ async function recalcDues() {
 
   // ── Fee Ledger ──
   document.getElementById('nd-fee-table').innerHTML = `
-    <div class="section-heading" style="margin-top:4px">Fee Ledger — up to Semester ${selSem}</div>
+    <div class="section-heading" style="margin-top:4px">Fee Ledger — up to ${semLabel(selSem)}</div>
     <table class="data-table">
       <thead><tr><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
       <tbody>
-        <tr><td>Registration Fee (one-time)</td><td>₹500</td><td style="color:var(--success)">Paid at admission</td></tr>
-        <tr><td>Caution Money (one-time)</td><td>₹1,500</td><td style="color:var(--success)">Paid at admission</td></tr>
-        ${Array.from({length:semCount},(_,i)=>{
-          const semNo = admissionSem + i;
-          const p = payments.find(pp=>pp.paymentType==='semesterFee' && Number(pp.semester)===semNo && pp.status==='approved');
-          const pending = payments.find(pp=>pp.paymentType==='semesterFee' && Number(pp.semester)===semNo && pp.status==='pending');
+        <tr><td>Registration Fee (one-time)</td><td>₹500</td><td style="color:${regPaid?'var(--success)':'var(--danger)'}">${regPaid?'✓ Paid':'✗ Unpaid'}</td></tr>
+        <tr><td>Caution Money (one-time)</td><td>₹1,500</td><td style="color:${cautionPaid?'var(--success)':'var(--danger)'}">${cautionPaid?'✓ Paid':'✗ Unpaid'}</td></tr>
+        ${sessionsUpToSel.map(sessId => {
+          const p = payments.find(pp=>pp.paymentType==='semesterFee' && String(pp.semester).trim()===sessId && pp.status==='approved');
+          const pending = payments.find(pp=>pp.paymentType==='semesterFee' && String(pp.semester).trim()===sessId && pp.status==='pending');
           const receiptInfo = p ? ` · Receipt: ${p.receipt}` : (pending ? ` · Receipt: ${pending.receipt} (pending)` : '');
           const status = p
             ? '<span style="color:var(--success)">✓ Paid</span>'
             : pending ? '<span style="color:var(--warning)">⏳ Pending warden approval</span>'
             : '<span style="color:var(--danger)">✗ Unpaid</span>';
-          return `<tr><td>Hostel Allotment Fee — Semester ${semNo}${receiptInfo}</td><td>₹4,500</td><td>${status}</td></tr>`;
+          return `<tr><td>Hostel Allotment Fee — ${semLabel(sessId)}${receiptInfo}</td><td>₹4,500</td><td>${status}</td></tr>`;
         }).join('')}
         ${fines.filter(f=>!f.revoked).map(f=>{
           const status = f.paid ? '<span style="color:var(--success)">✓ Paid</span>' : '<span style="color:var(--danger)">✗ Unpaid</span>';
@@ -6005,8 +6489,8 @@ async function recalcDues() {
     // All clear — normal issue button
     issueWrap.innerHTML = pcBlock + `
       <div style="margin-top:12px">
-        <button class="btn btn-success" id="nd-issue-btn" onclick="issueNoDues('${s.rollFull}','${s.email}',${selSem})">
-          ✓ Issue No Dues Certificate (Semester ${selSem})
+        <button class="btn btn-success" id="nd-issue-btn" onclick="issueNoDues('${s.rollFull}','${s.email}','${selSem}')">
+          ✓ Issue No Dues Certificate (${semLabel(selSem)})
         </button>
       </div>`;
 
@@ -6050,8 +6534,8 @@ async function recalcDues() {
               style="font-size:13px;padding:8px 10px;border:1.5px solid var(--danger);border-radius:var(--radius-md);width:100%;outline:none"/>
             <div class="err-msg hidden" id="err-nd-override-reason">Override reason is required.</div>
           </div>
-          <button class="btn btn-danger btn-sm" onclick="issueNoDuesOverride('${s.rollFull}','${s.email}',${selSem})">
-            🔓 Override &amp; Issue No Dues Certificate (Semester ${selSem})
+          <button class="btn btn-danger btn-sm" onclick="issueNoDuesOverride('${s.rollFull}','${s.email}','${selSem}')">
+            🔓 Override &amp; Issue No Dues Certificate (${semLabel(selSem)})
           </button>
         </div>
       </div>`;
@@ -6093,15 +6577,15 @@ async function recalcDues() {
 async function issueNoDues(rollFull, studentEmail, semester) {
   const btn = document.getElementById('nd-issue-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Issuing…';
-  const refNo = 'GPMH/HLND/'+rollFull+'/S'+semester;
+  const refNo = 'GPMH/HLND/'+rollFull+'/'+String(semester).replace(/[^a-zA-Z0-9]/g,'');
   const r = await callBackend('issueNoDues', {
     rollFull, studentEmail, wardenEmail:'gpmungerhostel@gmail.com', refNo, semester
   });
-  btn.disabled=false; btn.innerHTML=`✓ Issue No Dues Certificate (Semester ${semester})`;
+  btn.disabled=false; btn.innerHTML=`✓ Issue No Dues Certificate (${semLabel(semester)})`;
   if(r.success) {
     document.getElementById('nd-issue-wrap').innerHTML = `
       <div class="alert alert-success">
-        ✓ No Dues Certificate issued for Semester ${semester}!<br/>
+        ✓ No Dues Certificate issued for ${semLabel(semester)}!<br/>
         <strong>Ref: ${refNo}</strong><br/>
         ${r.driveUrl ? `<a href="${r.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="margin-top:8px;font-size:12px">📄 Download No Dues Certificate</a>` : ''}
       </div>`;
@@ -6132,22 +6616,22 @@ async function issueNoDuesOverride(rollFull, studentEmail, semester) {
   }
   if(errEl) errEl.classList.add('hidden');
 
-  if(!confirm(`⚠ Override pre-check and issue No Dues Certificate for Semester ${semester}?\n\nReason: "${reason}"\n\nThis action will be logged. Proceed?`)) return;
+  if(!confirm(`⚠ Override pre-check and issue No Dues Certificate for ${semLabel(semester)}?\n\nReason: "${reason}"\n\nThis action will be logged. Proceed?`)) return;
 
   const btn = document.querySelector('#nd-issue-wrap .btn-danger');
   if(btn) { btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Issuing…'; }
 
-  const refNo = 'GPMH/HLND/'+rollFull+'/S'+semester;
+  const refNo = 'GPMH/HLND/'+rollFull+'/'+String(semester).replace(/[^a-zA-Z0-9]/g,'');
   const r = await callBackend('issueNoDues', {
     rollFull, studentEmail, wardenEmail:'gpmungerhostel@gmail.com',
     refNo, semester, overrideReason: reason
   });
-  if(btn) { btn.disabled=false; btn.innerHTML=`🔓 Override & Issue No Dues Certificate (Semester ${semester})`; }
+  if(btn) { btn.disabled=false; btn.innerHTML=`🔓 Override & Issue No Dues Certificate (${semLabel(semester)})`; }
 
   if(r.success) {
     document.getElementById('nd-issue-wrap').innerHTML = `
       <div class="alert alert-success">
-        ✓ No Dues Certificate issued (with override) for Semester ${semester}!<br/>
+        ✓ No Dues Certificate issued (with override) for ${semLabel(semester)}!<br/>
         <strong>Ref: ${refNo}</strong><br/>
         <div style="font-size:12px;margin-top:6px;color:var(--gray-600)">Override reason logged: <em>${reason}</em></div>
         ${r.driveUrl ? `<a href="${r.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="margin-top:8px;font-size:12px">📄 Download No Dues Certificate</a>` : ''}
@@ -7009,8 +7493,8 @@ function admRenderPayList() {
   const ftName = (p) => {
     if(p.paymentType==='registrationFee') return 'Registration Fee';
     if(p.paymentType==='cautionMoney')    return 'Caution Money';
-    if(p.paymentType==='semesterFee')     return `Semester ${p.semester} Fee`;
-    return p.paymentType || `Semester ${p.semester} Fee`;
+    if(p.paymentType==='semesterFee')     return semLabel(p.semester) + ' Fee';
+    return p.paymentType || semLabel(p.semester) + ' Fee';
   };
   const expectedFee = (p) => {
     if(p.expectedAmount) return Number(p.expectedAmount);
@@ -7021,7 +7505,7 @@ function admRenderPayList() {
   const feeImgSlot = (p) => {
     if(p.paymentType==='registrationFee') return 'regFeeImage';
     if(p.paymentType==='cautionMoney')    return 'cautionFeeImage';
-    return 'payment_sem_' + (p.semester||'1');
+    return sessionToSlot(p.semester||'1');  // "Even 2026" → "payment_ses_even_2026"
   };
 
   list.innerHTML = studentsWithPending.map(s => {
@@ -7065,7 +7549,12 @@ function admRenderPayList() {
       const isPartial      = shortfall > 0;
       const indices        = items.map(p=>p._idx);
       const indicesJson    = JSON.stringify(indices);
-      const primarySlot    = feeImgSlot(items[0]);
+      const primarySlot    = (() => {
+        // Mirror backend: semester fee slot takes priority for consolidated receipts
+        const semItem = items.find(p => p.paymentType === 'semesterFee');
+        if(semItem) return sessionToSlot(semItem.semester||'1');
+        return feeImgSlot(items[0]);
+      })();
       const imgId          = `adm-payimg-${safeRoll}-${key.replace(/[^a-zA-Z0-9]/g,'_')}`;
       const rejId          = `rej-inline-${safeRoll}-${key.replace(/[^a-zA-Z0-9]/g,'_')}`;
 
@@ -7159,7 +7648,7 @@ function admRenderPayList() {
           <div class="task-meta" style="margin-top:2px">
             ${s.rollFull} &nbsp;·&nbsp;
             <span class="badge badge-${s.status||'pending'}">${s.status||'pending'}</span>
-            &nbsp;·&nbsp; <span style="font-size:11px;color:var(--gray-600)">Semester ${s.semesterNo||'—'}</span>
+            &nbsp;·&nbsp; <span style="font-size:11px;color:var(--gray-600)">${semLabel(s.admissionSession||s.semesterNo||'—')}</span>
           </div>
           ${s.hostelInfo?.hostel?`<div style="font-size:11px;color:var(--gray-600);margin-top:2px">🏠 ${s.hostelInfo.hostel}${s.hostelInfo.roomNo?' · Room '+s.hostelInfo.roomNo:''}</div>`:''}
           <div style="font-size:11px;color:var(--gray-500);margin-top:2px">📧 ${s.email||'—'} &nbsp;·&nbsp; 📞 ${s.contactNo||'—'}</div>
@@ -7253,9 +7742,21 @@ async function admLoadSinglePayImageSlot(rollFull, slot, containerId) {
   const container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '<span style="font-size:11px;color:var(--gray-400)"><span class="spinner spinner-dark"></span> Loading…</span>';
-  const r = await callBackend('getOneImage', {rollFull, type:slot});
+
+  // Normalise slot (same logic as loadPaymentReceiptImage)
+  let normSlot = String(slot||'').trim();
+  if(normSlot.startsWith('payment_sem_')) {
+    const part = normSlot.replace('payment_sem_','');
+    if(isNaN(Number(part))) normSlot = sessionToSlot(part);
+  } else if(!normSlot.startsWith('payment_ses_') && !['regFeeImage','cautionFeeImage','allotFeeImage','photo','signature'].includes(normSlot)) {
+    const num = Number(normSlot);
+    normSlot = isNaN(num) ? sessionToSlot(normSlot) : 'payment_sem_' + num;
+  }
+
+  const r = await callBackend('getOneImage', {rollFull, type: normSlot});
   let b64 = (r.success&&r.image)?r.image:null;
-  if(!b64 && slot.startsWith('payment_sem_')) {
+  // Fallback to legacy allotFeeImage for any slot type
+  if(!b64) {
     const fb = await callBackend('getOneImage', {rollFull, type:'allotFeeImage'});
     b64 = (fb.success&&fb.image)?fb.image:null;
   }
@@ -7320,20 +7821,58 @@ async function admRejectPaymentBatchConfirm(rollFull, indices, rejId) {
 }
 
 
-// FIX #2: Load admission receipt images one-at-a-time via getOneImage (lazy, parallel)
-async function admLoadAdmissionImages(rollFull, containerId) {
+// Load admission receipt images one-at-a-time via getOneImage (lazy, parallel).
+// payments: optional array of student.payments to show session-keyed fee slots.
+//
+// FIXED: allotFeeImage is no longer a static slot in the list — it would always show
+// "No image" for old records because it was never written (bug now fixed in backend).
+// Instead, we derive session-keyed slots from actual payment records, and use
+// allotFeeImage only as a fallback for students with no semesterFee payment records
+// (e.g. legacy data). This prevents duplicate tiles and stale "No image" placeholders.
+async function admLoadAdmissionImages(rollFull, containerId, payments) {
   const container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--gray-400)"><span class="spinner spinner-dark"></span> Loading receipt images…</div>';
+
+  // Base slots: only one-time fees (reg + caution). Allotment fee handled below.
   const slots = [
     { type:'regFeeImage',     label:'Reg. Fee Receipt'     },
-    { type:'cautionFeeImage', label:'Caution Money Receipt' },
-    { type:'allotFeeImage',   label:'Allotment Fee Receipt' }
+    { type:'cautionFeeImage', label:'Caution Money Receipt' }
   ];
-  // Fetch all 3 in parallel (one Drive file each, not all 18)
+
+  // Build session-keyed allotment fee slots from actual approved/pending payment records
+  const seenSlots = new Set(slots.map(s => s.type));
+  let hasSessionSlots = false;
+  if(Array.isArray(payments)) {
+    payments
+      .filter(p => p.paymentType === 'semesterFee' && p.semester)
+      .forEach(p => {
+        const slot = sessionToSlot(p.semester);
+        if(!seenSlots.has(slot)) {
+          seenSlots.add(slot);
+          slots.push({ type: slot, label: semLabel(p.semester) + ' Receipt' });
+          hasSessionSlots = true;
+        }
+      });
+  }
+  // Fallback: if no semesterFee records exist (legacy data), show the allotFeeImage slot
+  if(!hasSessionSlots) {
+    slots.push({ type:'allotFeeImage', label:'Allotment Fee Receipt' });
+  }
+
   const results = await Promise.all(slots.map(({type}) => callBackend('getOneImage', {rollFull, type})));
+
+  // For session slots with no image yet, try allotFeeImage as a fallback
+  // (covers students whose record existed before the backend fix was deployed)
+  const fallbackR = hasSessionSlots
+    ? await callBackend('getOneImage', {rollFull, type:'allotFeeImage'})
+    : {success:false};
+  const fallbackB64 = (fallbackR.success && fallbackR.image) ? fallbackR.image : null;
+
   container.innerHTML = slots.map(({type, label}, i) => {
-    const b64 = (results[i].success && results[i].image) ? results[i].image : null;
+    let b64 = (results[i].success && results[i].image) ? results[i].image : null;
+    // For session slots only: fall back to allotFeeImage if no direct image found
+    if(!b64 && type.startsWith('payment_ses_') && fallbackB64) b64 = fallbackB64;
     if(!b64) return `<div style="background:var(--gray-50);border-radius:var(--radius-sm);padding:10px;text-align:center;font-size:11px;color:var(--gray-400)">${label}<br/><em>No image</em></div>`;
     return `<div style="text-align:center">
       <img src="data:image/jpeg;base64,${b64}" alt="${label}"
@@ -7345,18 +7884,21 @@ async function admLoadAdmissionImages(rollFull, containerId) {
   }).join('');
 }
 
-// FIX #2: Single semester payment receipt via getOneImage (one Drive file, not all 18)
-// Works for ANY semester a student was admitted in (Sem 1, 3, 5, etc.) because
-// newStudent() always saves the allotment image under BOTH "allotFeeImage" AND
-// "payment_sem_N", so the primary lookup always hits first.
+// Load single semester payment receipt via getOneImage.
+// Works for ANY session a student was allotted (Odd 2025, Even 2026 etc.) because
+// submitConsolidatedPayment now saves the semesterFee image to BOTH the session-keyed
+// slot (payment_ses_*) AND allotFeeImage, so both lookup paths will always hit.
+// For legacy records (pre-fix), allotFeeImage is used as a fallback.
 async function admLoadSinglePayImage(rollFull, semester, containerId) {
   const container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '<span style="font-size:11px;color:var(--gray-400)"><span class="spinner spinner-dark"></span> Loading…</span>';
-  // Primary: payment_sem_N (covers all semesters including admission semester)
-  let r = await callBackend('getOneImage', {rollFull, type:'payment_sem_'+semester});
+  // Convert session string to canonical slot: "Even 2026" → "payment_ses_even_2026"
+  const num = Number(semester);
+  const slot = isNaN(num) ? sessionToSlot(semester) : 'payment_sem_' + num;
+  let r = await callBackend('getOneImage', {rollFull, type: slot});
   let b64 = (r.success && r.image) ? r.image : null;
-  // Fallback: allotFeeImage (for older records saved before payment_sem_N slot was added)
+  // Fallback: legacy allotFeeImage
   if(!b64) {
     const fb = await callBackend('getOneImage', {rollFull, type:'allotFeeImage'});
     b64 = (fb.success && fb.image) ? fb.image : null;
@@ -7365,7 +7907,7 @@ async function admLoadSinglePayImage(rollFull, semester, containerId) {
     container.innerHTML = '<span style="font-size:11px;color:var(--gray-400)">No receipt image uploaded.</span>';
     return;
   }
-  const label = 'Semester ' + semester + ' Fee Receipt';
+  const label = semLabel(semester) + ' Fee Receipt';
   container.innerHTML = `
     <img src="data:image/jpeg;base64,${b64}" alt="${label}"
       style="max-width:180px;max-height:130px;object-fit:contain;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);cursor:pointer;display:block"
@@ -7727,7 +8269,7 @@ function admFilterAllStudents() {
       statusLabel = 'approved';
       statusExtra = maxApprovedSem
         ? `<div style="font-size:10px;color:var(--success);font-weight:600;margin-top:2px">up to Sem ${maxApprovedSem}</div>`
-        : `<div style="font-size:10px;color:var(--gray-400);margin-top:2px">Sem ${s.semesterNo||'1'}</div>`;
+        : `<div style="font-size:10px;color:var(--gray-400);margin-top:2px">${semLabel(s.admissionSession||s.semesterNo||'—')}</div>`;
     } else {
       statusLabel = s.status||'pending';
     }
@@ -7806,10 +8348,14 @@ function admOpenDetail(rollFull) {
   document.getElementById('adm-detail-title').textContent =
     'Student Details: ' + s.name + ' (' + s.rollFull + ')';
 
-  // Current semester — highest approved payment semester, else semesterNo
-  const approvedSems = (Array.isArray(s.payments)?s.payments:[])
-    .filter(p=>p.status==='approved').map(p=>Number(p.semester)).filter(n=>n>0);
-  const currentSem = approvedSems.length ? String(Math.max(...approvedSems)) : (s.semesterNo||'—');
+  // Current session — highest approved payment session, else admissionSession
+  // FIX: filter by any approved semesterFee payment (not just numeric ones), and
+  // prefer the session string (sessionId or semester) over a bare number.
+  const approvedSemPayments = (Array.isArray(s.payments)?s.payments:[])
+    .filter(p => p.status === 'approved' && p.paymentType === 'semesterFee' && p.semester);
+  const currentSem = approvedSemPayments.length
+    ? String(approvedSemPayments[approvedSemPayments.length-1].semester)
+    : (s.admissionSession || s.semesterNo || '—');
 
   const hi = s.hostelInfo||{};
 
@@ -7820,7 +8366,7 @@ function admOpenDetail(rollFull) {
     ['G.Contact', s.guardianContact],
     ['District / PIN', (s.district||'—') + ' — ' + (s.pin||'—')],
     ['Permanent Address', (s.address||'—') + (s.pin ? ', PIN '+s.pin : '')],
-    ['Semester', currentSem],
+    ['Session', semLabel(currentSem)],
     ['Status', `<span class="badge badge-${s.status||'pending'}">${s.status||'pending'}</span>`],
     // Receipt data is in payments[] JSON — visible in the Payments tab
     ['Allotment', hi.roomNo
@@ -7851,7 +8397,7 @@ function admOpenDetail(rollFull) {
     <table class="data-table">
       <thead><tr><th>Semester</th><th>Receipt</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
       <tbody>${pays.map(p=>`<tr>
-        <td>Semester ${p.semester}</td>
+        <td>${semLabel(p.semester)}</td>
         <td style="font-size:12px">${p.receipt||'—'}</td>
         <td>₹${p.amount||4500}</td>
         <td><span class="badge badge-${p.status==='approved'?'approved':p.status==='rejected'?'rejected':'pending'}">${p.status||'pending'}</span></td>
@@ -8516,9 +9062,574 @@ async function regenLeavePDF(leaveId, btn) {
     toast('Re-generate failed: ' + (r.error || 'Unknown error'), 'error');
   }
 }
+// ═══════════════════════════════════════════════════════════════════════════════
+// REPORT 3 — DEBARMENT REGISTER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let _rpt3Data = [];
+
+async function loadDebarReport() {
+  const btn = document.getElementById('btn-load-rpt3');
+  const st  = document.getElementById('rpt3-load-status');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Loading…';
+  if(st) st.textContent = '';
+
+  const r = await callBackend('getDebars', {});
+  btn.disabled = false; btn.innerHTML = '🔄 Load / Refresh Report';
+
+  if(!r.success) {
+    if(st) st.innerHTML = `<span style="color:var(--danger)">Failed: ${r.error||''}</span>`;
+    return;
+  }
+
+  // Flatten: one row per debar record (a student may have multiple)
+  _rpt3Data = [];
+  (r.students||[]).forEach(s => {
+    (s.debarRecords||[]).forEach(d => {
+      _rpt3Data.push({ student: s, record: d });
+    });
+  });
+
+  renderDebarReport();
+  if(st) st.innerHTML = `<span style="color:var(--success)">✅ Loaded ${_rpt3Data.length} record(s) across ${(r.students||[]).length} student(s)</span>`;
+}
+
+function _semLabelLocal(v) {
+  return semLabel(v);
+}
+
+function renderDebarReport() {
+  const wrap   = document.getElementById('rpt3-table-wrap');
+  if(!wrap) return;
+  if(!_rpt3Data.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">No debarment records found. Click <strong>Load Report</strong>.</div>';
+    return;
+  }
+
+  const rollF   = (document.getElementById('rpt3-filter-roll')?.value||'').toLowerCase();
+  const semF    = (document.getElementById('rpt3-filter-sem')?.value||'').toLowerCase();
+  const statusF = document.getElementById('rpt3-filter-status')?.value || 'all';
+
+  let rows = _rpt3Data.filter(({student: s, record: d}) => {
+    if(rollF && !s.rollFull.toLowerCase().includes(rollF) && !s.name.toLowerCase().includes(rollF)) return false;
+    if(semF) {
+      const semStr = (d.semesters||[]).map(_semLabelLocal).join(' ').toLowerCase();
+      if(!semStr.includes(semF)) return false;
+    }
+    if(statusF === 'active' && !d.active) return false;
+    if(statusF === 'lifted' &&  d.active) return false;
+    return true;
+  });
+
+  // Sort: active first, then by debarredAt desc
+  rows.sort((a, b) => {
+    if(a.record.active && !b.record.active) return -1;
+    if(!a.record.active && b.record.active) return 1;
+    return new Date(b.record.debarredAt) - new Date(a.record.debarredAt);
+  });
+
+  // Summary counters
+  const totalAll   = rows.length;
+  const activeCount = rows.filter(r => r.record.active).length;
+  const liftedCount = rows.filter(r => !r.record.active).length;
+  // Fee waivers = total semesters across all active records
+  const waivedSemCount = rows.filter(r => r.record.active)
+    .reduce((a, r) => a + (r.record.semesters||[]).length, 0);
+
+  document.getElementById('rpt3-sum-total').textContent  = totalAll;
+  document.getElementById('rpt3-sum-active').textContent = activeCount;
+  document.getElementById('rpt3-sum-lifted').textContent = liftedCount;
+  document.getElementById('rpt3-sum-waived').textContent = waivedSemCount + ' sem(s)';
+  document.getElementById('rpt3-summary').style.display  = 'block';
+  document.getElementById('rpt3-count').textContent      = rows.length + ' record(s)';
+
+  if(!rows.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">No records match the current filters.</div>';
+    return;
+  }
+
+  const COLS = ['#','Roll No.','Student Name','Hostel','Room No.',
+                'Debarred Semester(s)','Debarment Period','Reason',
+                'Fee Waived','Debarment Status','Lifted On','Restore Reason'];
+  let html = `<table class="data-table" style="min-width:1100px">
+    <thead><tr>${COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+
+  rows.forEach(({student: s, record: d}, idx) => {
+    const semLabels  = (d.semesters||[]).map(_semLabelLocal).join(', ');
+    const feeWaived  = (d.semesters||[]).length * 4500;
+    const debarDate  = d.debarredAt  ? new Date(d.debarredAt).toLocaleDateString('en-IN')  : '—';
+    const restoreDate= d.restoredAt  ? new Date(d.restoredAt).toLocaleDateString('en-IN')  : '—';
+    const period     = d.active
+      ? `${debarDate} → <span style="color:var(--danger);font-weight:600">Ongoing</span>`
+      : `${debarDate} → ${restoreDate}`;
+    const statusBadge = d.active
+      ? `<span style="padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#c0392b;color:#fff">ACTIVE</span>`
+      : `<span style="padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#e8f5e9;color:#1a6b3c;border:1px solid #1a6b3c">LIFTED</span>`;
+    const hi = s.hostelInfo || {};
+    const rowBg = d.active ? 'background:#fff5f5' : '';
+
+    html += `<tr style="${rowBg}">
+      <td style="color:var(--gray-400);font-size:12px">${idx+1}</td>
+      <td style="font-weight:600;color:var(--navy)">${s.rollFull}</td>
+      <td>${s.name}</td>
+      <td>${hi.hostel||'—'}</td>
+      <td>${hi.roomNo||'—'}</td>
+      <td style="color:var(--danger);font-weight:600">${semLabels}</td>
+      <td style="font-size:12px">${period}</td>
+      <td style="font-size:12px;max-width:180px">${d.reason||'—'}</td>
+      <td style="color:var(--warning);font-weight:600">₹${feeWaived.toLocaleString('en-IN')}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px">${d.restoredAt ? restoreDate : '—'}</td>
+      <td style="font-size:12px;max-width:160px">${d.restoreReason||'—'}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  window._rpt3Filtered = rows;
+}
+
+function clearRpt3Filters() {
+  ['rpt3-filter-roll','rpt3-filter-sem'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const st = document.getElementById('rpt3-filter-status'); if(st) st.value = 'all';
+  renderDebarReport();
+}
+
+function generateDebarReport(format) {
+  const rows = window._rpt3Filtered;
+  if(!rows || !rows.length) { toast('Load the report first.', 'error'); return; }
+
+  const genDate = new Date().toLocaleDateString('en-IN');
+
+  if(format === 'pdf') {
+    _printReport('rpt3-table-wrap', 'Debarment Register', 'All Sessions', 'All Hostels', genDate);
+    return;
+  }
+
+  // XLSX export
+  const headers = ['S.No','Roll No.','Student Name','Hostel','Room No.',
+                   'Debarred Semester(s)','Debar Date','Restore Date',
+                   'Reason','Fee Waived (₹)','Status','Restore Reason'];
+  const data = rows.map(({student: s, record: d}, i) => {
+    const hi = s.hostelInfo || {};
+    return [
+      i+1,
+      s.rollFull,
+      s.name,
+      hi.hostel||'',
+      hi.roomNo||'',
+      (d.semesters||[]).map(_semLabelLocal).join(', '),
+      d.debarredAt  ? new Date(d.debarredAt).toLocaleDateString('en-IN')  : '',
+      d.restoredAt  ? new Date(d.restoredAt).toLocaleDateString('en-IN')  : '',
+      d.reason||'',
+      (d.semesters||[]).length * 4500,
+      d.active ? 'ACTIVE' : 'LIFTED',
+      d.restoreReason||''
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['Debarment Register — Government Polytechnic Munger Hostel'],
+    ['Generated on: ' + genDate],
+    [],
+    headers,
+    ...data
+  ]);
+  ws['!cols'] = headers.map((_,i) => ({wch: [6,14,22,10,10,28,14,14,30,14,10,24][i]||14}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Debarment Register');
+  XLSX.writeFile(wb, `Debarment_Register_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+
+
+let debarRecordsCache = [];
+
+// ── Session composer helpers ────────────────────────────────────────────────
+// Returns the current active session string from warden data (e.g. "Odd 2026")
+// Falls back to smart guess based on current month if not yet set.
+function getActiveSessionId() {
+  // Try to read from cached warden dashboard data
+  if (window._activeSessionId) return window._activeSessionId;
+  // Smart fallback: infer from current month
+  const now = new Date();
+  const m = now.getMonth() + 1; // 1–12
+  const y = now.getFullYear();
+  // Jul–Dec → Odd <year>,  Jan–Jun → Even <year>
+  return m >= 7 ? `Odd ${y}` : `Even ${y}`;
+}
+
+// Compose "Odd 2026" → sets hidden input + preview element
+function composeAdmissionSession() {
+  const type = (document.getElementById('ns-sem-type')?.value || '').trim();
+  const year = (document.getElementById('ns-sem-year')?.value || '').trim();
+  const hiddenEl  = document.getElementById('ns-semester');
+  const previewEl = document.getElementById('ns-sem-preview');
+  if (year.length === 4 && /^\d{4}$/.test(year)) {
+    const val = `${type} ${year}`;
+    if (hiddenEl) hiddenEl.value = val;
+    if (previewEl) { previewEl.textContent = val; previewEl.style.color = 'var(--navy)'; }
+    clearErr('ns-semester');
+  } else {
+    if (hiddenEl) hiddenEl.value = '';
+    if (previewEl) { previewEl.textContent = '—'; previewEl.style.color = 'var(--gray-400)'; }
+  }
+}
+
+// Pre-fill admission session picker from the active session (called after warden data loads)
+function populateAdmissionSessionDropdown() {
+  const sessionId = getActiveSessionId(); // e.g. "Odd 2026"
+  const parts = sessionId.split(' ');
+  const type  = parts[0] || '';
+  const year  = parts[1] || String(new Date().getFullYear());
+  const typeEl = document.getElementById('ns-sem-type');
+  const yearEl = document.getElementById('ns-sem-year');
+  if (typeEl && type) typeEl.value = type;
+  if (yearEl && year) yearEl.value = year;
+  composeAdmissionSession();
+}
+
+// ── Debar session tag picker ─────────────────────────────────────────────────
+// Preview label updates as user types in debar picker
+document.addEventListener('input', function(e) {
+  if (e.target.id === 'wr-debar-sem-year' || e.target.id === 'wr-debar-sem-type') {
+    const type = (document.getElementById('wr-debar-sem-type')?.value || '').trim();
+    const year = (document.getElementById('wr-debar-sem-year')?.value || '').trim();
+    const prev = document.getElementById('wr-debar-sem-preview');
+    if (prev) {
+      if (type && year.length === 4 && /^\d{4}$/.test(year)) {
+        prev.textContent = `${type} ${year}`;
+        prev.style.color = 'var(--navy)';
+      } else {
+        prev.textContent = '—';
+        prev.style.color = 'var(--gray-400)';
+      }
+    }
+  }
+});
+
+// Returns currently selected debar sessions as array (replaces checkbox .debar-sem-chk reads)
+function getDebarSelectedSessions() {
+  const tags = document.querySelectorAll('#wr-debar-sem-tags .debar-tag');
+  return Array.from(tags).map(t => t.dataset.value);
+}
+
+function addDebarSession() {
+  const type = (document.getElementById('wr-debar-sem-type')?.value || '').trim();
+  const year = (document.getElementById('wr-debar-sem-year')?.value || '').trim();
+  if (year.length !== 4 || !/^\d{4}$/.test(year)) {
+    showErr('wr-debar-sems', 'Enter a valid 4-digit year.');
+    return;
+  }
+  clearErr('wr-debar-sems');
+  const val = `${type} ${year}`;
+  const tagsContainer = document.getElementById('wr-debar-sem-tags');
+  if (!tagsContainer) return;
+  // Prevent duplicate
+  if (getDebarSelectedSessions().includes(val)) {
+    showErr('wr-debar-sems', `${val} Session is already added.`);
+    return;
+  }
+  // Check if already debarred (disabled sems stored on tag container as data attr)
+  const alreadyDebarred = (tagsContainer.dataset.debarred || '').split(',').filter(Boolean);
+  if (alreadyDebarred.includes(val)) {
+    showErr('wr-debar-sems', `Student is already debarred for ${val} Session.`);
+    return;
+  }
+  // Add tag
+  const tag = document.createElement('span');
+  tag.className = 'debar-tag';
+  tag.dataset.value = val;
+  tag.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:var(--danger-bg);border:1.5px solid var(--danger);border-radius:20px;padding:4px 12px;font-size:13px;font-weight:600;color:var(--danger)';
+  tag.innerHTML = `${val} Session <button type="button" onclick="removeDebarTag(this)" title="Remove"
+    style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:15px;line-height:1;padding:0;margin:0">×</button>`;
+  tagsContainer.appendChild(tag);
+  // Reset pickers
+  document.getElementById('wr-debar-sem-year').value = '';
+  const prev = document.getElementById('wr-debar-sem-preview');
+  if (prev) { prev.textContent = '—'; prev.style.color = 'var(--gray-400)'; }
+}
+
+function removeDebarTag(btn) {
+  btn.closest('.debar-tag')?.remove();
+}
+
+// Legacy: getDebarSemesterOptions no longer needed (kept as stub for safety)
+function getDebarSemesterOptions() { return []; }
+
+function loadDebarTab() {
+  populateDebarStudentDropdown();
+  renderDebarSemCheckboxes();
+  loadDebarRecords();
+}
+
+function populateDebarStudentDropdown() {
+  const sel = document.getElementById('wr-debar-roll');
+  if(!sel) return;
+  // Only show approved / pending / debarred students
+  const eligible = wrStudents.filter(s => ['approved','pending','debarred'].includes(s.status));
+  sel.innerHTML = '<option value="">— Select Student —</option>' +
+    eligible.map(s => `<option value="${s.rollFull}">${s.name} (${s.rollFull}) — ${s.status}</option>`).join('');
+  document.getElementById('wr-debar-student-info').classList.add('hidden');
+}
+
+function renderDebarSemCheckboxes() {
+  const container = document.getElementById('wr-debar-sem-checkboxes');
+  if(!container) return;
+  const opts = getDebarSemesterOptions();
+  container.innerHTML = opts.map(o => `
+    <label style="display:inline-flex;align-items:center;gap:6px;background:var(--gray-50);border:1.5px solid var(--gray-200);
+      border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:13px;user-select:none;
+      transition:all .15s ease" class="debar-sem-label">
+      <input type="checkbox" value="${o.value}" class="debar-sem-chk" onchange="onDebarSemChange(this)"
+        style="accent-color:var(--danger);width:15px;height:15px;cursor:pointer"/>
+      ${o.label}
+    </label>`).join('');
+}
+
+function onDebarSemChange(chk) {
+  const label = chk.closest('label');
+  if(chk.checked) {
+    label.style.background = 'var(--danger-bg)';
+    label.style.borderColor = 'var(--danger)';
+    label.style.color = 'var(--danger)';
+    label.style.fontWeight = '600';
+  } else {
+    label.style.background = 'var(--gray-50)';
+    label.style.borderColor = 'var(--gray-200)';
+    label.style.color = '';
+    label.style.fontWeight = '';
+  }
+}
+
+function onDebarStudentChange() {
+  const roll = document.getElementById('wr-debar-roll').value;
+  const infoBox = document.getElementById('wr-debar-student-info');
+  if(!roll) { infoBox.classList.add('hidden'); return; }
+  const s = wrStudents.find(x => x.rollFull === roll);
+  if(!s) { infoBox.classList.add('hidden'); return; }
+
+  // Check existing active debars
+  const links = (typeof s.driveLinks === 'object' ? s.driveLinks : {});
+  const debarRecords = Array.isArray(links.debarRecords) ? links.debarRecords : [];
+  const activeDebars = debarRecords.filter(d => d.active);
+  const activeSems   = activeDebars.flatMap(d => d.semesters || []);
+
+  let info = `<strong>${s.name}</strong> — ${s.rollFull} &nbsp;|&nbsp; Status: <strong>${s.status}</strong>`;
+  if(s.hostelInfo) info += ` &nbsp;|&nbsp; Room: ${s.hostelInfo.hostel||''}-${s.hostelInfo.roomNo||''}`;
+  if(activeDebars.length) {
+    info += `<br/><span style="color:var(--danger);font-weight:600">⚠ Currently debarred for: ${activeSems.join(', ')}</span>`;
+  }
+
+  infoBox.innerHTML = info;
+  infoBox.classList.remove('hidden');
+
+  // Store already-debarred sessions on the tags container so addDebarSession() can reject them
+  const tagsContainer = document.getElementById('wr-debar-sem-tags');
+  if (tagsContainer) {
+    tagsContainer.innerHTML = '';                            // reset any previous tags
+    tagsContainer.dataset.debarred = activeSems.join(','); // comma-separated already-debarred list
+  }
+  // Pre-fill the session picker with the current active session as a convenience
+  const activeId = getActiveSessionId();
+  const parts = activeId.split(' ');
+  const typeEl = document.getElementById('wr-debar-sem-type');
+  const yearEl = document.getElementById('wr-debar-sem-year');
+  const prevEl = document.getElementById('wr-debar-sem-preview');
+  if (typeEl && parts[0]) typeEl.value = parts[0];
+  if (yearEl && parts[1]) yearEl.value = parts[1];
+  if (prevEl) { prevEl.textContent = activeId; prevEl.style.color = 'var(--navy)'; }
+}
+
+async function doDebarStudent() {
+  const roll    = document.getElementById('wr-debar-roll').value.trim();
+  const reason  = document.getElementById('wr-debar-reason').value.trim();
+  const checked = getDebarSelectedSessions(); // reads from tag-based session picker
+  const resDiv  = document.getElementById('wr-debar-result');
+  resDiv.innerHTML = '';
+
+  let valid = true;
+  if(!roll)           { showErr('wr-debar-roll',   'Please select a student.'); valid=false; } else clearErr('wr-debar-roll');
+  if(!checked.length) { showErr('wr-debar-sems',   'Select at least one semester to debar.'); valid=false; } else clearErr('wr-debar-sems');
+  if(!reason)         { showErr('wr-debar-reason',  'Please provide a reason for debarment.'); valid=false; } else clearErr('wr-debar-reason');
+  if(!valid) return;
+
+  const student = wrStudents.find(s => s.rollFull === roll);
+  const semLabels = checked.map(v => {
+    return semLabel(v);
+  });
+
+  const confirmed = confirm(
+    `⚠ CONFIRM DEBARMENT\n\n` +
+    `Student: ${student ? student.name : roll} (${roll})\n` +
+    `Semester(s): ${semLabels.join(', ')}\n` +
+    `Reason: ${reason}\n\n` +
+    `Session fee will be WAIVED for these session(s).\n` +
+    `The student's status will be changed to "Debarred".\n\n` +
+    `Proceed?`
+  );
+  if(!confirmed) return;
+
+  const btn = document.getElementById('btn-wr-debar');
+  btn.disabled = true; btn.textContent = '⏳ Processing…';
+
+  const r = await callBackend('debarStudent', {rollFull: roll, semesters: checked, reason});
+
+  btn.disabled = false; btn.textContent = '🚫 Confirm Debarment';
+
+  if(r.success) {
+    resDiv.innerHTML = `<div class="alert alert-danger" style="margin-bottom:0">
+      ✅ Student <strong>${student ? student.name : roll}</strong> has been debarred for
+      <strong>${semLabels.join(', ')}</strong>.<br/>
+      Session fee has been waived for these session(s).<br/>
+      <small style="color:var(--gray-600)">Debar ID: ${r.debarId}</small>
+    </div>`;
+    // Reset form
+    document.getElementById('wr-debar-roll').value = '';
+    document.getElementById('wr-debar-reason').value = '';
+    document.getElementById('wr-debar-student-info').classList.add('hidden');
+    // Clear session tags
+    const tagsEl = document.getElementById('wr-debar-sem-tags');
+    if (tagsEl) { tagsEl.innerHTML = ''; tagsEl.dataset.debarred = ''; }
+    // Refresh data
+    await loadWardenData();
+    await loadDebarRecords();
+    toast('Student debarred successfully. Session fee waived.', 'success');
+  } else {
+    resDiv.innerHTML = `<div class="alert alert-danger">${r.error || 'Debarment failed.'}</div>`;
+    toast(r.error || 'Debarment failed.', 'error');
+  }
+}
+
+async function loadDebarRecords() {
+  const listDiv = document.getElementById('wr-debar-list');
+  if(!listDiv) return;
+  listDiv.innerHTML = '<p style="color:var(--gray-400);font-size:13px">Loading…</p>';
+  const r = await callBackend('getDebars', {});
+  if(!r.success) { listDiv.innerHTML = `<p style="color:var(--danger)">${r.error}</p>`; return; }
+  debarRecordsCache = r.students || [];
+  renderDebarList();
+}
+
+function renderDebarList() {
+  const listDiv = document.getElementById('wr-debar-list');
+  if(!listDiv) return;
+  const query  = (document.getElementById('wr-debar-search')?.value||'').toLowerCase();
+  const filter = document.getElementById('wr-debar-filter')?.value || 'all';
+
+  let students = debarRecordsCache;
+  if(query) students = students.filter(s =>
+    s.name.toLowerCase().includes(query) || s.rollFull.toLowerCase().includes(query));
+
+  // Collect all records across all students
+  const allRows = [];
+  students.forEach(s => {
+    (s.debarRecords||[]).forEach(d => {
+      if(filter === 'active'  && !d.active) return;
+      if(filter === 'lifted'  &&  d.active) return;
+      allRows.push({student: s, record: d});
+    });
+  });
+
+  if(!allRows.length) {
+    listDiv.innerHTML = '<p style="color:var(--gray-400);font-size:13px;padding:16px 0">No debar records found.</p>';
+    return;
+  }
+
+  // Sort: active first, then by date desc
+  allRows.sort((a,b) => {
+    if(a.record.active && !b.record.active) return -1;
+    if(!a.record.active && b.record.active) return 1;
+    return new Date(b.record.debarredAt) - new Date(a.record.debarredAt);
+  });
+
+  listDiv.innerHTML = allRows.map(({student: s, record: d}) => {
+    const semLabels = (d.semesters||[]).map(v => {
+      const n = Number(v);
+      return (!isNaN(n) && n >= 1 && n <= 8) ? 'Semester ' + n : v + ' Session';
+    });
+    const debarDate  = d.debarredAt ? new Date(d.debarredAt).toLocaleDateString('en-IN') : '—';
+    const restoreDate = d.restoredAt ? new Date(d.restoredAt).toLocaleDateString('en-IN') : null;
+    const statusBadge = d.active
+      ? `<span style="background:var(--danger);color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700">ACTIVE</span>`
+      : `<span style="background:var(--success-bg);color:var(--success);border:1px solid var(--success);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700">LIFTED</span>`;
+
+    return `
+    <div style="border:1.5px solid ${d.active ? 'var(--danger)' : 'var(--gray-200)'};border-radius:var(--radius-md);
+      padding:14px 16px;margin-bottom:12px;background:${d.active ? 'var(--danger-bg)' : 'var(--gray-50)'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div>
+          <strong style="font-size:15px;color:var(--navy)">${s.name}</strong>
+          <span style="font-size:12px;color:var(--gray-600);margin-left:8px">${s.rollFull}</span>
+          ${statusBadge}
+        </div>
+        <div style="font-size:11px;color:var(--gray-400)">ID: ${d.id}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:10px">
+        <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Debarred Semester(s)</span><br/>
+          <strong style="color:var(--danger)">${semLabels.join(', ')}</strong>
+        </div>
+        <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Fee Impact</span><br/>
+          <span style="color:var(--success);font-weight:600">✓ Session fee waived</span>
+        </div>
+        <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Debarred On</span><br/>
+          ${debarDate}
+        </div>
+        ${restoreDate ? `<div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Lifted On</span><br/>${restoreDate}</div>` : ''}
+      </div>
+      <div style="font-size:13px;color:var(--gray-800);background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px">
+        <strong>Reason:</strong> ${d.reason || '—'}
+      </div>
+      ${d.restoreReason ? `<div style="font-size:12px;color:var(--success);margin-bottom:10px"><strong>Restore note:</strong> ${d.restoreReason}</div>` : ''}
+      ${d.active ? `
+        <button class="btn btn-secondary btn-sm" onclick="doUndebarStudent('${s.rollFull}','${d.id}','${(s.name||'').replace(/'/g,"\\'")}')">
+          ✅ Lift Debarment
+        </button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function doUndebarStudent(rollFull, debarId, studentName) {
+  const restoreReason = prompt(
+    `Lift debarment for ${studentName} (${rollFull})?\n\nOptionally enter a reason for lifting the debarment:\n(Leave blank to use default reason)`
+  );
+  if(restoreReason === null) return; // cancelled
+
+  const r = await callBackend('undebarStudent', {rollFull, debarId, restoreReason: restoreReason.trim()});
+  if(r.success) {
+    await loadWardenData();
+    await loadDebarRecords();
+    // Check if any active debars remain for this student (cache was just refreshed)
+    const stuEntry = debarRecordsCache.find(s => s.rollFull === rollFull);
+    const stillDebarred = stuEntry && (stuEntry.debarRecords||[]).some(d => d.active);
+    const msg = stillDebarred
+      ? 'Debarment record lifted. Student still has other active debar records.'
+      : 'Debarment lifted. Student status restored to Approved.';
+    toast(msg, 'success');
+  } else {
+    toast(r.error || 'Failed to lift debarment.', 'error');
+  }
+}
+
+function quickDebarFromPanel() {
+  // Save the roll BEFORE wrCloseApprove nulls wrCurrentApproveRoll
+  const roll = wrCurrentApproveRoll || '';
+  wrCloseApprove();
+  wrTab('debar');
+  // Pre-select student in dropdown after a short delay (tab renders first)
+  setTimeout(() => {
+    const sel = document.getElementById('wr-debar-roll');
+    if(sel && roll) {
+      sel.value = roll;
+      onDebarStudentChange();
+    }
+  }, 150);
+}
 
 </script>
-<!-- ── RESUBMIT PAYMENT MODAL ── -->
 <div id="resubmit-modal" class="hidden" style="position:fixed;inset:0;background:rgba(15,39,68,.55);z-index:9000;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--white);border-radius:var(--radius-lg);padding:28px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);animation:slideUp .25s ease">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
