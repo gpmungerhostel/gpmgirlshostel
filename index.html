@@ -1639,7 +1639,7 @@
           <div style="font-weight:700;color:var(--danger);font-size:14px;margin-bottom:4px">⚠ Debarment Notice</div>
           <div style="font-size:13px;color:var(--gray-600)">
             Debarring a student prevents them from staying in the hostel for the selected session(s).
-            <strong>Session fee is automatically waived</strong> for debarred sessions.
+            <strong>You must decide whether to waive or retain the session fee</strong> for the debarred session(s) — see the fee option below.
             Debarment can be lifted at any time using the Restore button.
           </div>
         </div>
@@ -1661,7 +1661,7 @@
 
           <div class="field">
             <label>Session(s) to Debar <span class="req">*</span></label>
-            <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Add one or more sessions. The student will not be charged for these sessions.</div>
+            <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Add one or more sessions the student is debarred from.</div>
             <!-- Session picker: Odd/Even + year → Add as tag -->
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
               <select id="wr-debar-sem-type"
@@ -1689,7 +1689,51 @@
             <div class="err-msg hidden" id="err-wr-debar-reason"></div>
           </div>
 
-          <div id="wr-debar-result" style="margin-bottom:12px"></div>
+          <!-- ── FEE WAIVER DECISION — Warden must explicitly choose ── -->
+          <div class="field" style="background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:4px">
+            <label style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px;display:block">
+              💰 Session Fee Decision <span class="req">*</span>
+            </label>
+            <div style="font-size:12px;color:var(--gray-600);margin-bottom:12px;line-height:1.5">
+              Decide whether the hostel session fee is waived or remains due for the debarred session(s).
+              <strong>This cannot be changed after debarment is confirmed.</strong><br/>
+              — Choose <strong>Waive</strong> if the student is not at fault (e.g. medical, administrative).<br/>
+              — Choose <strong>Retain</strong> if the student was debarred mid-session or due to misconduct and the fee is still owed.
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1;min-width:200px;
+                border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:12px 14px;background:#fff;
+                transition:border-color .15s" id="wr-debar-fee-waive-lbl">
+                <input type="radio" name="wr-debar-fee" id="wr-debar-fee-waive" value="true"
+                  style="margin-top:2px;accent-color:var(--success)"
+                  onchange="onDebarFeeChange()"/>
+                <div>
+                  <div style="font-weight:700;color:var(--success);font-size:13px">✓ Waive Fee</div>
+                  <div style="font-size:12px;color:var(--gray-600);margin-top:2px">
+                    Session fee is <strong>not charged</strong>. The outstanding due is cancelled.
+                    Suitable when the student is not at fault.
+                  </div>
+                </div>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1;min-width:200px;
+                border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:12px 14px;background:#fff;
+                transition:border-color .15s" id="wr-debar-fee-retain-lbl">
+                <input type="radio" name="wr-debar-fee" id="wr-debar-fee-retain" value="false"
+                  style="margin-top:2px;accent-color:var(--danger)"
+                  onchange="onDebarFeeChange()"/>
+                <div>
+                  <div style="font-weight:700;color:var(--danger);font-size:13px">✗ Retain Fee (Fee Still Due)</div>
+                  <div style="font-size:12px;color:var(--gray-600);margin-top:2px">
+                    Session fee <strong>remains outstanding</strong>. Student must pay before No Dues can be issued.
+                    Suitable for mid-session debarment or misconduct cases.
+                  </div>
+                </div>
+              </label>
+            </div>
+            <div class="err-msg hidden" id="err-wr-debar-fee" style="margin-top:8px"></div>
+          </div>
+
+          <div id="wr-debar-result" style="margin-bottom:12px;margin-top:14px"></div>
           <button class="btn btn-danger" onclick="doDebarStudent()" id="btn-wr-debar" style="font-weight:600">🚫 Confirm Debarment</button>
         </div>
 
@@ -1779,7 +1823,7 @@
         <div id="wr-quick-debar-section" style="margin-top:16px;border-top:1px solid var(--gray-100);padding-top:16px;display:none">
           <div class="section-heading" style="color:var(--danger)">🚫 Debar from Hostel</div>
           <div style="font-size:13px;color:var(--gray-600);margin-bottom:12px">
-            Debar this student for one or more sessions. Session fee will be automatically waived for debarred sessions.
+            Debar this student for one or more sessions. You will choose whether the session fee is waived or retained.
             You can manage all debar records from the <strong>Debar Students</strong> tab.
           </div>
           <button class="btn btn-danger btn-sm" onclick="quickDebarFromPanel()" style="font-size:13px">
@@ -3118,19 +3162,17 @@ function renderDuesTab() {
   if(s.status === 'debarred') {
     const dl = getDriveLinks(s);
     const debarRecs = Array.isArray(dl.debarRecords) ? dl.debarRecords : [];
-    const waivedSems = debarRecs.filter(d=>d.active).flatMap(d=>d.semesters||[]).map(v=>{
-      return semLabel(v);
-    });
-    const waivedPayments = (Array.isArray(s.payments)?s.payments:[])
-      .filter(p=>p.status==='waived' && p.paymentType==='semesterFee_due');
+    const activeRecs = debarRecs.filter(d=>d.active);
+    const waivedSems   = activeRecs.filter(d=>d.feeWaived!==false).flatMap(d=>d.semesters||[]).map(v=>semLabel(v));
+    const retainedSems = activeRecs.filter(d=>d.feeWaived===false).flatMap(d=>d.semesters||[]).map(v=>semLabel(v));
     const notice = document.createElement('div');
     notice.id = 'cs-debar-dues-notice';
     notice.innerHTML = `<div class="alert" style="background:var(--danger-bg);border-left:4px solid var(--danger);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
-      <strong>🚫 Debarment Active — Session Fee Waived</strong>
-      <div style="margin-top:6px;font-size:13px">
-        You are debarred for: <strong>${waivedSems.join(', ')||'—'}</strong>.<br/>
-        Hostel semester fee is <strong>not applicable</strong> for these semester(s).<br/>
-        <span style="font-size:12px;color:var(--gray-600)">Contact the Hostel Warden if you have any questions regarding your debarment.</span>
+      <strong>🚫 Debarment Active</strong>
+      <div style="margin-top:8px;font-size:13px;line-height:1.7">
+        ${waivedSems.length ? `<div>✓ <strong>Fee Waived</strong> for: <strong>${waivedSems.join(', ')}</strong>. Hostel fee is not applicable for these session(s).</div>` : ''}
+        ${retainedSems.length ? `<div style="color:var(--danger);margin-top:4px">✗ <strong>Fee Still Due</strong> for: <strong>${retainedSems.join(', ')}</strong>. Session fee was not waived — you must pay this fee before No Dues can be issued.</div>` : ''}
+        <div style="margin-top:8px;font-size:12px;color:var(--gray-600)">Contact the Hostel Warden if you have any questions regarding your debarment.</div>
       </div>
     </div>`;
     const duesEl = document.getElementById('cs-dues');
@@ -3391,6 +3433,28 @@ function renderOutstandingDues(s) {
               ? `₹${pendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${remaining.toLocaleString('en-IN')}. Deadline: ${due.deadline || '—'}`
               : `Full amount submitted, pending verification. Deadline: ${due.deadline || '—'}`)
           : (due.deadline ? `Deadline: ${due.deadline}` : ''),
+        status: hasPending ? 'pending' : 'unpaid'
+      });
+    }
+  });
+
+  // 1b. debarred_due: session fee NOT waived on debarment — still owed after debar is lifted.
+  //     These appear even when the student is re-approved (debarment lifted) so the fee
+  //     doesn't silently disappear when status changes back to 'approved'.
+  payments.filter(p => p.paymentType === 'semesterFee_due' && p.status === 'debarred_due').forEach(due => {
+    const dueAmount = expectedAmountFor('semesterFee', due.semester, Number(due.amount || 4500));
+    const approved  = isApprovedFor('semesterFee', due.semester);
+    if(!approved) {
+      const pendingPaid = getAllocatedFor('semesterFee', due.semester);
+      const hasPending  = isPendingFor('semesterFee', due.semester);
+      const remaining   = Math.max(0, dueAmount - pendingPaid);
+      items.push({
+        label: `Hostel Allotment Fee — ${semLabel(due.semester)} (Debarment Fee)`,
+        amount: dueAmount,
+        allocatedPending: hasPending ? pendingPaid : 0,
+        note: hasPending
+          ? `₹${pendingPaid.toLocaleString('en-IN')} submitted (pending verification). Balance: ₹${remaining.toLocaleString('en-IN')}`
+          : `Fee was not waived during debarment. Must be paid before No Dues can be issued.`,
         status: hasPending ? 'pending' : 'unpaid'
       });
     }
@@ -6316,6 +6380,11 @@ async function recalcDues() {
     p.paymentType === 'semesterFee' && p.status === 'pending' &&
     p.semester && sessionsUpToSel.includes(String(p.semester).trim())).length;
 
+  // debarred_due: fee NOT waived on debarment — counts as unpaid in the ledger
+  const debarredDuePayments = payments.filter(p =>
+    p.paymentType === 'semesterFee_due' && p.status === 'debarred_due' &&
+    p.semester && sessionsUpToSel.includes(String(p.semester).trim()));
+
   // Registration and caution: paid if at least one approved entry exists
   const regPaid     = payments.some(p => p.paymentType === 'registrationFee' && p.status === 'approved');
   const cautionPaid = payments.some(p => p.paymentType === 'cautionMoney'    && p.status === 'approved');
@@ -6387,10 +6456,12 @@ async function recalcDues() {
         ${sessionsUpToSel.map(sessId => {
           const p = payments.find(pp=>pp.paymentType==='semesterFee' && String(pp.semester).trim()===sessId && pp.status==='approved');
           const pending = payments.find(pp=>pp.paymentType==='semesterFee' && String(pp.semester).trim()===sessId && pp.status==='pending');
+          const debarDue = payments.find(pp=>pp.paymentType==='semesterFee_due' && String(pp.semester||pp.sessionId||'').trim()===sessId && pp.status==='debarred_due');
           const receiptInfo = p ? ` · Receipt: ${p.receipt}` : (pending ? ` · Receipt: ${pending.receipt} (pending)` : '');
           const status = p
             ? '<span style="color:var(--success)">✓ Paid</span>'
             : pending ? '<span style="color:var(--warning)">⏳ Pending warden approval</span>'
+            : debarDue ? '<span style="color:var(--danger)">✗ Unpaid — Fee retained during debarment</span>'
             : '<span style="color:var(--danger)">✗ Unpaid</span>';
           return `<tr><td>Hostel Allotment Fee — ${semLabel(sessId)}${receiptInfo}</td><td>₹4,500</td><td>${status}</td></tr>`;
         }).join('')}
@@ -9132,8 +9203,10 @@ function renderDebarReport() {
   const totalAll   = rows.length;
   const activeCount = rows.filter(r => r.record.active).length;
   const liftedCount = rows.filter(r => !r.record.active).length;
-  // Fee waivers = total semesters across all active records
-  const waivedSemCount = rows.filter(r => r.record.active)
+  // Fee waivers = semesters across ACTIVE records where fee was actually waived (feeWaived !== false)
+  // LIFTED records no longer count — the debar is over, fee status returns to zero in this summary.
+  const waivedSemCount = rows
+    .filter(r => r.record.active && r.record.feeWaived !== false)
     .reduce((a, r) => a + (r.record.semesters||[]).length, 0);
 
   document.getElementById('rpt3-sum-total').textContent  = totalAll;
@@ -9156,7 +9229,16 @@ function renderDebarReport() {
 
   rows.forEach(({student: s, record: d}, idx) => {
     const semLabels  = (d.semesters||[]).map(_semLabelLocal).join(', ');
-    const feeWaived  = (d.semesters||[]).length * 4500;
+    // Fee Waived column: only show amount for ACTIVE records where fee was waived.
+    // Once debar is LIFTED the waiver no longer applies → show ₹0.
+    // Also ₹0 when warden chose to retain the fee (feeWaived === false).
+    const feeWaivedAmt = (d.active && d.feeWaived !== false)
+      ? (d.semesters||[]).length * 4500 : 0;
+    const feeWaivedCell = feeWaivedAmt > 0
+      ? `<span style="color:var(--warning);font-weight:600">₹${feeWaivedAmt.toLocaleString('en-IN')}</span>`
+      : d.active && d.feeWaived === false
+        ? `<span style="color:var(--danger);font-size:12px">Fee retained</span>`
+        : `<span style="color:var(--gray-400);font-size:12px">—</span>`;
     const debarDate  = d.debarredAt  ? new Date(d.debarredAt).toLocaleDateString('en-IN')  : '—';
     const restoreDate= d.restoredAt  ? new Date(d.restoredAt).toLocaleDateString('en-IN')  : '—';
     const period     = d.active
@@ -9177,7 +9259,7 @@ function renderDebarReport() {
       <td style="color:var(--danger);font-weight:600">${semLabels}</td>
       <td style="font-size:12px">${period}</td>
       <td style="font-size:12px;max-width:180px">${d.reason||'—'}</td>
-      <td style="color:var(--warning);font-weight:600">₹${feeWaived.toLocaleString('en-IN')}</td>
+      <td>${feeWaivedCell}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px">${d.restoredAt ? restoreDate : '—'}</td>
       <td style="font-size:12px;max-width:160px">${d.restoreReason||'—'}</td>
@@ -9444,30 +9526,53 @@ function onDebarStudentChange() {
   if (prevEl) { prevEl.textContent = activeId; prevEl.style.color = 'var(--navy)'; }
 }
 
+// Highlight selected fee option card
+function onDebarFeeChange() {
+  const waive  = document.getElementById('wr-debar-fee-waive');
+  const retain = document.getElementById('wr-debar-fee-retain');
+  const waiveLbl  = document.getElementById('wr-debar-fee-waive-lbl');
+  const retainLbl = document.getElementById('wr-debar-fee-retain-lbl');
+  if(!waive || !retain) return;
+  waiveLbl.style.borderColor  = waive.checked  ? 'var(--success)' : 'var(--gray-200)';
+  waiveLbl.style.background   = waive.checked  ? 'var(--success-bg,#e8f8ee)' : '#fff';
+  retainLbl.style.borderColor = retain.checked ? 'var(--danger)'  : 'var(--gray-200)';
+  retainLbl.style.background  = retain.checked ? 'var(--danger-bg,#fff0f0)' : '#fff';
+  clearErr('wr-debar-fee');
+}
+
 async function doDebarStudent() {
   const roll    = document.getElementById('wr-debar-roll').value.trim();
   const reason  = document.getElementById('wr-debar-reason').value.trim();
-  const checked = getDebarSelectedSessions(); // reads from tag-based session picker
+  const checked = getDebarSelectedSessions();
   const resDiv  = document.getElementById('wr-debar-result');
   resDiv.innerHTML = '';
 
+  // Read feeWaived radio
+  const feeWaiveEl  = document.getElementById('wr-debar-fee-waive');
+  const feeRetainEl = document.getElementById('wr-debar-fee-retain');
+  const feeWaivedSelected = feeWaiveEl && feeWaiveEl.checked ? true
+                          : feeRetainEl && feeRetainEl.checked ? false : null;
+
   let valid = true;
-  if(!roll)           { showErr('wr-debar-roll',   'Please select a student.'); valid=false; } else clearErr('wr-debar-roll');
-  if(!checked.length) { showErr('wr-debar-sems',   'Select at least one semester to debar.'); valid=false; } else clearErr('wr-debar-sems');
-  if(!reason)         { showErr('wr-debar-reason',  'Please provide a reason for debarment.'); valid=false; } else clearErr('wr-debar-reason');
+  if(!roll)                  { showErr('wr-debar-roll',   'Please select a student.'); valid=false; } else clearErr('wr-debar-roll');
+  if(!checked.length)        { showErr('wr-debar-sems',   'Select at least one semester to debar.'); valid=false; } else clearErr('wr-debar-sems');
+  if(!reason)                { showErr('wr-debar-reason', 'Please provide a reason for debarment.'); valid=false; } else clearErr('wr-debar-reason');
+  if(feeWaivedSelected===null){ showErr('wr-debar-fee',   'Please select a fee decision (Waive or Retain).'); valid=false; } else clearErr('wr-debar-fee');
   if(!valid) return;
 
-  const student = wrStudents.find(s => s.rollFull === roll);
-  const semLabels = checked.map(v => {
-    return semLabel(v);
-  });
+  const student  = wrStudents.find(s => s.rollFull === roll);
+  const semLabels = checked.map(v => semLabel(v));
+  const feeText   = feeWaivedSelected
+    ? 'Session fee will be WAIVED for these session(s).'
+    : 'Session fee will REMAIN DUE — student must pay before No Dues can be issued.';
 
   const confirmed = confirm(
     `⚠ CONFIRM DEBARMENT\n\n` +
-    `Student: ${student ? student.name : roll} (${roll})\n` +
-    `Semester(s): ${semLabels.join(', ')}\n` +
-    `Reason: ${reason}\n\n` +
-    `Session fee will be WAIVED for these session(s).\n` +
+    `Student  : ${student ? student.name : roll} (${roll})\n` +
+    `Session(s): ${semLabels.join(', ')}\n` +
+    `Reason   : ${reason}\n\n` +
+    `Fee Decision: ${feeWaivedSelected ? '✓ Fee WAIVED' : '✗ Fee RETAINED (still due)'}\n` +
+    `${feeText}\n\n` +
     `The student's status will be changed to "Debarred".\n\n` +
     `Proceed?`
   );
@@ -9476,7 +9581,7 @@ async function doDebarStudent() {
   const btn = document.getElementById('btn-wr-debar');
   btn.disabled = true; btn.textContent = '⏳ Processing…';
 
-  const r = await callBackend('debarStudent', {rollFull: roll, semesters: checked, reason});
+  const r = await callBackend('debarStudent', {rollFull: roll, semesters: checked, reason, feeWaived: feeWaivedSelected});
 
   btn.disabled = false; btn.textContent = '🚫 Confirm Debarment';
 
@@ -9484,20 +9589,23 @@ async function doDebarStudent() {
     resDiv.innerHTML = `<div class="alert alert-danger" style="margin-bottom:0">
       ✅ Student <strong>${student ? student.name : roll}</strong> has been debarred for
       <strong>${semLabels.join(', ')}</strong>.<br/>
-      Session fee has been waived for these session(s).<br/>
+      <strong>Fee decision:</strong> ${feeWaivedSelected
+        ? '<span style="color:var(--success)">✓ Session fee waived.</span>'
+        : '<span style="color:var(--danger)">✗ Session fee retained — student must pay before No Dues.</span>'}<br/>
       <small style="color:var(--gray-600)">Debar ID: ${r.debarId}</small>
     </div>`;
     // Reset form
     document.getElementById('wr-debar-roll').value = '';
     document.getElementById('wr-debar-reason').value = '';
     document.getElementById('wr-debar-student-info').classList.add('hidden');
-    // Clear session tags
+    if(feeWaiveEl)  { feeWaiveEl.checked  = false; }
+    if(feeRetainEl) { feeRetainEl.checked = false; }
+    onDebarFeeChange();
     const tagsEl = document.getElementById('wr-debar-sem-tags');
-    if (tagsEl) { tagsEl.innerHTML = ''; tagsEl.dataset.debarred = ''; }
-    // Refresh data
+    if(tagsEl) { tagsEl.innerHTML = ''; tagsEl.dataset.debarred = ''; }
     await loadWardenData();
     await loadDebarRecords();
-    toast('Student debarred successfully. Session fee waived.', 'success');
+    toast('Student debarred. Fee: ' + (feeWaivedSelected ? 'Waived.' : 'Retained — still due.'), feeWaivedSelected ? 'success' : 'warning');
   } else {
     resDiv.innerHTML = `<div class="alert alert-danger">${r.error || 'Debarment failed.'}</div>`;
     toast(r.error || 'Debarment failed.', 'error');
@@ -9573,7 +9681,10 @@ function renderDebarList() {
           <strong style="color:var(--danger)">${semLabels.join(', ')}</strong>
         </div>
         <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Fee Impact</span><br/>
-          <span style="color:var(--success);font-weight:600">✓ Session fee waived</span>
+          ${d.feeWaived === false
+            ? `<span style="color:var(--danger);font-weight:600">✗ Fee retained — still due</span>`
+            : `<span style="color:var(--success);font-weight:600">✓ Session fee waived</span>`
+          }
         </div>
         <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Debarred On</span><br/>
           ${debarDate}
