@@ -1010,6 +1010,18 @@
           <label>Date</label>
           <input type="date" id="wr-fine-date"/>
         </div>
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="field" style="margin-bottom:0">
+            <label>Office Order / Letter No.</label>
+            <input type="text" id="wr-fine-letter-no" placeholder="e.g. GPM/HOS/2026/005"/>
+            <div class="hint">Reference number (shown to student)</div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Office Order Date</label>
+            <input type="date" id="wr-fine-letter-date"/>
+            <div class="hint">Date of the order (shown to student)</div>
+          </div>
+        </div>
         <button class="btn btn-danger" onclick="imposeFine()" id="wr-impose-btn">Impose Fine</button>
         <hr class="divider"/>
         <div class="section-heading">Revoke Fine</div>
@@ -1025,6 +1037,18 @@
             <select id="wr-revoke-fine">
               <option value="">— Select fine —</option>
             </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px;margin-bottom:12px">
+          <div class="field" style="margin-bottom:0">
+            <label>Revocation Letter No.</label>
+            <input type="text" id="wr-revoke-letter-no" placeholder="e.g. GPM/HOS/2026/010"/>
+            <div class="hint">Office order for revocation (shown to student)</div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Revocation Order Date</label>
+            <input type="date" id="wr-revoke-letter-date"/>
+            <div class="hint">Date of revocation order (shown to student)</div>
           </div>
         </div>
         <button class="btn btn-success btn-sm" onclick="revokeFine()" id="wr-revoke-btn">Revoke Selected Fine</button>
@@ -1631,6 +1655,169 @@
           </div>
         </div>
 
+
+        <!-- ── REPORT 4: FINES REGISTER ─────────────────────────────────── -->
+        <div style="border:1.5px solid #ffe0b2;border-radius:var(--radius-lg);overflow:hidden;margin-bottom:20px">
+          <div style="background:linear-gradient(135deg,#7a4000,#b35a00);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px">💰</span>
+              <div>
+                <div style="font-family:'Playfair Display',serif;font-size:15px;color:#fff;font-weight:700">Report 4 — Student Fines Register</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65)">All imposed fines · payment status · revocations · office orders</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" style="background:#fff;color:#7a4000;border-color:#fff;font-weight:600" onclick="generateFinesReport('xlsx')">⬇ Download .xlsx</button>
+              <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.4)" onclick="generateFinesReport('pdf')">🖨 Print / PDF</button>
+            </div>
+          </div>
+          <div style="padding:16px 20px;background:#fff8f0">
+            <div style="background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-600);margin-bottom:10px">🔍 Filters</div>
+              <div class="form-row" style="margin-bottom:8px">
+                <div class="field" style="margin-bottom:0">
+                  <label>Roll No. / Name</label>
+                  <input type="text" id="rpt4-filter-roll" placeholder="Search…" oninput="renderFinesReport()"/>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Fine Category</label>
+                  <select id="rpt4-filter-category" onchange="renderFinesReport()">
+                    <option value="">All Categories</option>
+                    <option>Discipline violation</option>
+                    <option>Late return</option>
+                    <option>Late fine</option>
+                    <option>Damage to property</option>
+                    <option>Noise complaint</option>
+                    <option>Ragging</option>
+                    <option>Unauthorized absence</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Payment Status</label>
+                  <select id="rpt4-filter-status" onchange="renderFinesReport()">
+                    <option value="">All</option>
+                    <option value="outstanding">Outstanding</option>
+                    <option value="paid">Paid &amp; Verified</option>
+                    <option value="pending">Payment Pending Verification</option>
+                    <option value="revoked">Revoked</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:0;display:flex;align-items:flex-end">
+                  <button class="btn btn-sm btn-secondary" onclick="clearRpt4Filters()" style="width:100%">✕ Clear</button>
+                </div>
+              </div>
+              <span id="rpt4-count" style="font-size:12px;color:var(--gray-600)"></span>
+            </div>
+            <div id="rpt4-table-wrap" style="overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-md);background:#fff">
+              <div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">Click <strong>Load Report</strong> to fetch latest data.</div>
+            </div>
+            <div id="rpt4-summary" style="margin-top:12px;display:none">
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Total Fines</div>
+                  <div id="rpt4-sum-total" style="font-size:20px;font-weight:700;color:var(--navy)">—</div>
+                </div>
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Total Amount Imposed</div>
+                  <div id="rpt4-sum-imposed" style="font-size:20px;font-weight:700;color:var(--danger)">—</div>
+                </div>
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Collected (Verified)</div>
+                  <div id="rpt4-sum-collected" style="font-size:20px;font-weight:700;color:var(--success)">—</div>
+                </div>
+                <div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Outstanding</div>
+                  <div id="rpt4-sum-outstanding" style="font-size:20px;font-weight:700;color:var(--warning)">—</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn btn-sm" style="background:#7a4000;color:#fff;border-color:#7a4000" onclick="loadFinesReport()" id="btn-load-rpt4">🔄 Load / Refresh Report</button>
+              <span id="rpt4-load-status" style="font-size:12px;margin-left:10px"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── REPORT 5: ALUMNI LIST ──────────────────────────────────────── -->
+        <div style="border:1.5px solid #d4c8f0;border-radius:var(--radius-lg);overflow:hidden;margin-bottom:20px">
+          <div style="background:linear-gradient(135deg,#3a1a7c,#5c3aaa);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px">🎓</span>
+              <div>
+                <div style="font-family:'Playfair Display',serif;font-size:15px;color:#fff;font-weight:700">Report 5 — Alumni Students List</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65)">Students who have vacated the hostel · No Dues · session history</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" style="background:#fff;color:#3a1a7c;border-color:#fff;font-weight:600" onclick="generateAlumniReport('xlsx')">⬇ Download .xlsx</button>
+              <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.4)" onclick="generateAlumniReport('pdf')">🖨 Print / PDF</button>
+            </div>
+          </div>
+          <div style="padding:16px 20px;background:#f5f0ff">
+            <div style="background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-600);margin-bottom:10px">🔍 Filters</div>
+              <div class="form-row" style="margin-bottom:8px">
+                <div class="field" style="margin-bottom:0">
+                  <label>Roll No. / Name</label>
+                  <input type="text" id="rpt5-filter-roll" placeholder="Search…" oninput="renderAlumniReport()"/>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Hostel Block</label>
+                  <input type="text" id="rpt5-filter-hostel" placeholder="e.g. Block A" oninput="renderAlumniReport()"/>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>No Dues Status</label>
+                  <select id="rpt5-filter-nodues" onchange="renderAlumniReport()">
+                    <option value="">All</option>
+                    <option value="issued">No Dues Issued</option>
+                    <option value="not_issued">Not Yet Issued</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:0;display:flex;align-items:flex-end">
+                  <button class="btn btn-sm btn-secondary" onclick="clearRpt5Filters()" style="width:100%">✕ Clear</button>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <label style="font-size:12px;color:var(--gray-600)">Sort by:</label>
+                <select id="rpt5-sort" style="font-size:12px;padding:4px 8px" onchange="renderAlumniReport()">
+                  <option value="name">Name</option>
+                  <option value="roll">Roll No.</option>
+                  <option value="vacated">Vacated Date</option>
+                </select>
+                <span id="rpt5-count" style="font-size:12px;color:var(--gray-600);margin-left:auto"></span>
+              </div>
+            </div>
+            <div id="rpt5-table-wrap" style="overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-md);background:#fff">
+              <div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">Click <strong>Load Report</strong> to fetch latest data.</div>
+            </div>
+            <div id="rpt5-summary" style="margin-top:12px;display:none">
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Total Alumni</div>
+                  <div id="rpt5-sum-total" style="font-size:20px;font-weight:700;color:var(--navy)">—</div>
+                </div>
+                <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">No Dues Issued</div>
+                  <div id="rpt5-sum-nodues" style="font-size:20px;font-weight:700;color:var(--success)">—</div>
+                </div>
+                <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Pending No Dues</div>
+                  <div id="rpt5-sum-pending" style="font-size:20px;font-weight:700;color:var(--warning)">—</div>
+                </div>
+                <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                  <div style="font-size:11px;color:var(--gray-600);text-transform:uppercase;letter-spacing:.3px">Caution Money Refunded</div>
+                  <div id="rpt5-sum-caution" style="font-size:20px;font-weight:700;color:var(--navy)">—</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn btn-sm" style="background:#3a1a7c;color:#fff;border-color:#3a1a7c" onclick="loadAlumniReport()" id="btn-load-rpt5">🔄 Load / Refresh Report</button>
+              <span id="rpt5-load-status" style="font-size:12px;margin-left:10px"></span>
+            </div>
+          </div>
+        </div>
+
       </div><!-- end wr-tab-reports -->
 
       <!-- Debar Students Tab -->
@@ -1687,6 +1874,19 @@
             <label>Reason for Debarment <span class="req">*</span></label>
             <textarea id="wr-debar-reason" rows="3" placeholder="State the reason for debarring this student (e.g. disciplinary action, misconduct, etc.)…" style="width:100%;padding:10px 13px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical"></textarea>
             <div class="err-msg hidden" id="err-wr-debar-reason"></div>
+          </div>
+
+          <div class="form-row" style="margin-bottom:16px">
+            <div class="field" style="margin-bottom:0">
+              <label>Office Order / Letter No.</label>
+              <input type="text" id="wr-debar-letter-no" placeholder="e.g. GPM/HOS/2026/001"/>
+              <div class="hint">Reference number of the office order (shown to student)</div>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Office Order Date</label>
+              <input type="date" id="wr-debar-letter-date"/>
+              <div class="hint">Date of the office order (shown to student)</div>
+            </div>
           </div>
 
           <!-- ── FEE WAIVER DECISION — Warden must explicitly choose ── -->
@@ -2895,6 +3095,19 @@ function renderStudentProfile() {
     const activeSems = activeDebars.flatMap(d=>d.semesters||[]).map(v=>{
       return semLabel(v);
     });
+    // Build per-record detail rows for student view
+    const debarDetailRows = activeDebars.map(d => {
+      const sems = (d.semesters||[]).map(v=>semLabel(v)).join(', ');
+      const orderDate = d.letterDate ? new Date(d.letterDate).toLocaleDateString('en-IN') : null;
+      return `<div style="background:rgba(255,255,255,.6);border:1px solid #f5c6c6;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:12px">
+        <div><strong style="color:var(--danger)">${sems}</strong></div>
+        ${d.reason ? `<div style="color:var(--gray-700);margin-top:3px"><strong>Reason:</strong> ${d.reason}</div>` : ''}
+        ${(d.letterNo||orderDate) ? `<div style="color:var(--gray-600);margin-top:3px">
+          <strong>Office Order:</strong> ${d.letterNo ? `No. <strong>${d.letterNo}</strong>` : ''}${orderDate ? ` dated ${orderDate}` : ''}
+        </div>` : ''}
+        <div style="color:var(--gray-500);margin-top:3px;font-size:11px">Debarred on: ${d.debarredAt ? new Date(d.debarredAt).toLocaleDateString('en-IN') : '—'}</div>
+      </div>`;
+    }).join('');
     const notice = document.createElement('div');
     notice.id = 'cs-debar-notice';
     notice.innerHTML = `<div class="alert alert-danger" style="margin-top:12px;border-left:4px solid var(--danger)">
@@ -2903,8 +3116,8 @@ function renderStudentProfile() {
         You have been <strong>debarred from the hostel</strong> for the following semester(s):
         <strong style="color:var(--danger)">${activeSems.join(', ') || 'N/A'}</strong>
       </div>
-      <div style="margin-top:6px;font-size:12px;color:var(--gray-600)">
-        ✅ Session fee is <strong>not applicable</strong> for the above session(s).<br/>
+      ${debarDetailRows}
+      <div style="margin-top:8px;font-size:12px;color:var(--gray-600)">
         If you believe this is an error or wish to appeal, please contact the Hostel Warden directly.
       </div>
     </div>`;
@@ -3537,12 +3750,14 @@ function renderOutstandingDues(s) {
   // 5. Active fines (unpaid or paid but not yet verified)
   fines.forEach((f, i) => {
     if(f.revoked) return;
+    const orderRef = (f.letterNo||f.letterDate)
+      ? ` · Order: ${f.letterNo||''}${f.letterDate?' dt. '+new Date(f.letterDate).toLocaleDateString('en-IN'):''}` : '';
     if(f.paid) {
       if(!f.paymentVerified) {
         items.push({
           label: `Fine — ${f.reason}`,
           amount: f.amount,
-          note: `${f.form} · Receipt submitted, pending verification`,
+          note: `${f.form}${orderRef} · Receipt submitted, pending verification`,
           status: 'pending'
         });
       }
@@ -3551,7 +3766,7 @@ function renderOutstandingDues(s) {
       items.push({
         label: isLateFine ? `Late Fine — ${f.reason}` : `Fine — ${f.reason}`,
         amount: f.amount,
-        note: isLateFine ? (f.note || '₹50/day, max ₹500') : (f.form + ' · ' + f.date),
+        note: isLateFine ? (f.note || '₹50/day, max ₹500') : (f.form + ' · ' + f.date + orderRef),
         status: 'unpaid'
       });
     }
@@ -3769,10 +3984,13 @@ function renderPaymentHistory(s) {
     const receipt = entry.f.paidReceiptNo||entry.f.rejectedReceiptNo||'—';
     const paidAt  = entry.f.paidAt||entry.f.rejectedPaidAt;
     const dateStr = paidAt?new Date(paidAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    const fOrderRef = (entry.f.letterNo||entry.f.letterDate)
+      ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">Office Order: ${entry.f.letterNo||''}${entry.f.letterDate?' dt. '+new Date(entry.f.letterDate).toLocaleDateString('en-IN'):''}</div>` : '';
     return `<tr style="${entry.status==='fine-rejected'?'background:var(--danger-bg)':''}">
       <td style="font-weight:500">
         <div style="margin-bottom:4px">Receipt No. <span style="font-family:monospace">${receipt}</span></div>
         <div style="font-size:12px;color:var(--gray-600)">${entry.label}</div>
+        ${fOrderRef}
       </td>
       <td style="font-weight:700;white-space:nowrap">₹${Number(entry.f.amount||0).toLocaleString('en-IN')}</td>
       <td style="white-space:nowrap">${dateStr}</td>
@@ -6065,7 +6283,7 @@ function populateFineStuDropdown() {
 function populateRevokeStuDropdown() {
   const sel = document.getElementById('wr-revoke-student');
   sel.innerHTML = '<option value="">— Select student —</option>';
-  wrStudents.filter(s=>s.status==='approved' && Array.isArray(s.fines) && s.fines.some(f=>!f.revoked)).forEach(s=>{
+  wrStudents.filter(s=>s.status==='approved' && Array.isArray(s.fines) && s.fines.some(f=>!f.revoked && !(f.paid && f.paymentVerified))).forEach(s=>{
     const o = document.createElement('option'); o.value=s.rollFull; o.text=`${s.name} (${s.rollFull})`; sel.add(o);
   });
 }
@@ -6079,6 +6297,7 @@ function populateFinesList() {
   if(!s || !Array.isArray(s.fines)) return;
   s.fines.forEach((f,i)=>{
     if(f.revoked) return;
+    if(f.paid && f.paymentVerified) return; // already paid & verified — cannot be revoked
     const o = document.createElement('option'); o.value=i; o.text=`₹${f.amount} — ${f.reason} (${f.date})`; sel.add(o);
   });
 }
@@ -6099,8 +6318,11 @@ async function imposeFine() {
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Imposing…';
 
   const s = wrStudents.find(x=>x.rollFull===roll);
+  const fineLetterNo   = (document.getElementById('wr-fine-letter-no')?.value||'').trim();
+  const fineLetterDate = (document.getElementById('wr-fine-letter-date')?.value||'').trim();
   const r = await callBackend('imposeFine', {
     rollFull:roll, amount, reason, form, date,
+    letterNo: fineLetterNo, letterDate: fineLetterDate,
     studentEmail: s?.email||'', wardenEmail:'gpmungerhostel@gmail.com'
   });
   btn.disabled=false; btn.textContent='Impose Fine';
@@ -6109,6 +6331,8 @@ async function imposeFine() {
     toast(`Fine of ₹${amount} imposed on ${s?.name||roll}.`, 'success');
     document.getElementById('wr-fine-amount').value='';
     document.getElementById('wr-fine-reason').value='';
+    const flnEl=document.getElementById('wr-fine-letter-no'); if(flnEl) flnEl.value='';
+    const fldEl=document.getElementById('wr-fine-letter-date'); if(fldEl) fldEl.value='';
     setVal('wr-fine-student','');
     // FIX: refresh only this student from server, update local cache
     const sfr = await callBackend('getStudent',{rollFull:roll});
@@ -6134,8 +6358,11 @@ async function revokeFine() {
   btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Revoking…';
 
   const s = wrStudents.find(x=>x.rollFull===roll);
+  const revokeLetterNo   = (document.getElementById('wr-revoke-letter-no')?.value||'').trim();
+  const revokeLetterDate = (document.getElementById('wr-revoke-letter-date')?.value||'').trim();
   const r = await callBackend('revokeFine', {
     rollFull:roll, fineIndex:Number(idx),
+    letterNo: revokeLetterNo, letterDate: revokeLetterDate,
     studentEmail: s?.email||'', wardenEmail:'gpmungerhostel@gmail.com'
   });
   btn.disabled=false; btn.textContent='Revoke Selected Fine';
@@ -6143,6 +6370,8 @@ async function revokeFine() {
   if(r.success) {
     toast('Fine revoked successfully.', 'success');
     setVal('wr-revoke-student',''); setVal('wr-revoke-fine','');
+    const rlnEl=document.getElementById('wr-revoke-letter-no'); if(rlnEl) rlnEl.value='';
+    const rldEl=document.getElementById('wr-revoke-letter-date'); if(rldEl) rldEl.value='';
     // FIX: refresh only this student
     const rvr = await callBackend('getStudent',{rollFull:roll});
     if(rvr.success&&rvr.student){const ri=wrStudents.findIndex(x=>x.rollFull===roll);if(ri>=0)wrStudents[ri]=rvr.student;}
@@ -6218,6 +6447,16 @@ function renderNoDuesResult(s) {
       <div class="alert alert-success" style="margin-top:12px">
         🎓 This student is already an <strong>Alumni</strong>. No Dues was previously issued (Ref: <strong>${s.noDuesRef||'—'}</strong>).
         ${docBtns ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${docBtns}</div>` : '<div style="font-size:12px;color:var(--gray-400);margin-top:6px">No document links found. Check Drive folder.</div>'}
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(26,107,60,.2)">
+          <div style="font-size:12px;font-weight:600;color:var(--gray-800);margin-bottom:8px">💰 Caution Money (₹1,500 — Refundable Deposit)</div>
+          ${dl.cautionRefunded
+            ? `<span style="color:var(--success);font-weight:600;font-size:13px">✅ Caution money refunded on ${dl.cautionRefundedAt ? new Date(dl.cautionRefundedAt).toLocaleDateString('en-IN') : '—'}</span>${dl.cautionRefundNote ? `<div style="font-size:12px;color:var(--gray-600);margin-top:3px">Note: ${dl.cautionRefundNote}</div>` : ''}`
+            : `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--warning)">⏳ Not yet marked as refunded</span>
+                <button class="btn btn-success btn-sm" onclick="markCautionRefunded('${s.rollFull}','${s.name}')" style="font-size:12px">✅ Mark Caution Refunded</button>
+               </div>`
+          }
+        </div>
       </div>`;
     // Hide the session selector — not needed
     const semField = document.querySelector('#nd-result .field');
@@ -6677,6 +6916,23 @@ async function issueNoDues(rollFull, studentEmail, semester) {
 }
 
 // ── OVERRIDE issue — warden bypasses pre-check issues with mandatory reason ──
+async function markCautionRefunded(rollFull, studentName) {
+  const refundNote = prompt(`Record caution money (₹1,500) refund for ${studentName} (${rollFull})?
+
+Optional note (e.g. receipt no., date of cash return):
+(Leave blank to skip note)`);
+  if(refundNote === null) return; // cancelled
+
+  const r = await callBackend('markCautionRefunded', {rollFull, refundNote: refundNote.trim()});
+  if(r.success) {
+    toast('Caution money refund recorded for ' + studentName + '.', 'success');
+    // Refresh the No Dues panel to reflect the change
+    fetchNoDuesStudent();
+  } else {
+    toast(r.error || 'Failed to record caution refund.', 'error');
+  }
+}
+
 async function issueNoDuesOverride(rollFull, studentEmail, semester) {
   const reason = document.getElementById('nd-override-reason')?.value.trim();
   const errEl  = document.getElementById('err-nd-override-reason');
@@ -8484,7 +8740,11 @@ function admOpenDetail(rollFull) {
     <table class="data-table">
       <thead><tr><th>Reason</th><th>Amount</th><th>Status</th></tr></thead>
       <tbody>${fines.map(f=>`<tr>
-        <td style="font-size:13px">${f.reason||'—'}</td>
+        <td style="font-size:13px">
+          ${f.reason||'—'}
+          ${(f.letterNo||f.letterDate)?`<div style="font-size:11px;color:var(--gray-500)">Order: ${f.letterNo||''}${f.letterDate?' dt. '+new Date(f.letterDate).toLocaleDateString('en-IN'):''}</div>`:''}
+          ${(f.revoked&&(f.revokeLetterNo||f.revokeLetterDate))?`<div style="font-size:11px;color:var(--success)">Revoke Order: ${f.revokeLetterNo||''}${f.revokeLetterDate?' dt. '+new Date(f.revokeLetterDate).toLocaleDateString('en-IN'):''}</div>`:''}
+        </td>
         <td>₹${f.amount||0}</td>
         <td>${f.revoked?'<span class="badge badge-approved">Revoked</span>':f.paid?'<span class="badge badge-approved">Paid</span>':'<span class="badge badge-rejected">Outstanding</span>'}</td>
       </tr>`).join('')}</tbody>
@@ -9581,7 +9841,9 @@ async function doDebarStudent() {
   const btn = document.getElementById('btn-wr-debar');
   btn.disabled = true; btn.textContent = '⏳ Processing…';
 
-  const r = await callBackend('debarStudent', {rollFull: roll, semesters: checked, reason, feeWaived: feeWaivedSelected});
+  const letterNo   = (document.getElementById('wr-debar-letter-no')?.value||'').trim();
+  const letterDate  = (document.getElementById('wr-debar-letter-date')?.value||'').trim();
+  const r = await callBackend('debarStudent', {rollFull: roll, semesters: checked, reason, feeWaived: feeWaivedSelected, letterNo, letterDate});
 
   btn.disabled = false; btn.textContent = '🚫 Confirm Debarment';
 
@@ -9603,6 +9865,9 @@ async function doDebarStudent() {
     onDebarFeeChange();
     const tagsEl = document.getElementById('wr-debar-sem-tags');
     if(tagsEl) { tagsEl.innerHTML = ''; tagsEl.dataset.debarred = ''; }
+    const lnEl = document.getElementById('wr-debar-letter-no');
+    const ldEl = document.getElementById('wr-debar-letter-date');
+    if(lnEl) lnEl.value=''; if(ldEl) ldEl.value='';
     await loadWardenData();
     await loadDebarRecords();
     toast('Student debarred. Fee: ' + (feeWaivedSelected ? 'Waived.' : 'Retained — still due.'), feeWaivedSelected ? 'success' : 'warning');
@@ -9654,51 +9919,56 @@ function renderDebarList() {
     return new Date(b.record.debarredAt) - new Date(a.record.debarredAt);
   });
 
-  listDiv.innerHTML = allRows.map(({student: s, record: d}) => {
+  const uid = 'dr_' + Date.now();
+  listDiv.innerHTML = allRows.map(({student: s, record: d}, idx) => {
     const semLabels = (d.semesters||[]).map(v => {
       const n = Number(v);
       return (!isNaN(n) && n >= 1 && n <= 8) ? 'Semester ' + n : v + ' Session';
     });
-    const debarDate  = d.debarredAt ? new Date(d.debarredAt).toLocaleDateString('en-IN') : '—';
+    const debarDate   = d.debarredAt ? new Date(d.debarredAt).toLocaleDateString('en-IN') : '—';
     const restoreDate = d.restoredAt ? new Date(d.restoredAt).toLocaleDateString('en-IN') : null;
+    const cardId      = uid + '_' + idx;
     const statusBadge = d.active
-      ? `<span style="background:var(--danger);color:#fff;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700">ACTIVE</span>`
-      : `<span style="background:var(--success-bg);color:var(--success);border:1px solid var(--success);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700">LIFTED</span>`;
+      ? `<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">ACTIVE</span>`
+      : `<span style="background:var(--success-bg);color:var(--success);border:1px solid var(--success);padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">LIFTED</span>`;
+    const letterInfo = d.letterNo
+      ? `<span style="font-size:11px;color:var(--gray-600);margin-left:6px">· Order: <strong>${d.letterNo}</strong>${d.letterDate ? ' dt. '+new Date(d.letterDate).toLocaleDateString('en-IN') : ''}</span>`
+      : '';
 
     return `
-    <div style="border:1.5px solid ${d.active ? 'var(--danger)' : 'var(--gray-200)'};border-radius:var(--radius-md);
-      padding:14px 16px;margin-bottom:12px;background:${d.active ? 'var(--danger-bg)' : 'var(--gray-50)'}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-        <div>
-          <strong style="font-size:15px;color:var(--navy)">${s.name}</strong>
-          <span style="font-size:12px;color:var(--gray-600);margin-left:8px">${s.rollFull}</span>
+    <div style="border:1.5px solid ${d.active ? 'var(--danger)' : 'var(--gray-200)'};border-radius:var(--radius-md);margin-bottom:8px;background:${d.active ? 'var(--danger-bg)' : 'var(--gray-50)'}">
+      <div onclick="var el=document.getElementById('${cardId}');el.style.display=el.style.display==='none'?'block':'none'"
+        style="display:flex;justify-content:space-between;align-items:center;padding:9px 13px;cursor:pointer;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0">
           ${statusBadge}
+          <strong style="font-size:13px;color:var(--navy)">${s.name}</strong>
+          <span style="font-size:11px;color:var(--gray-600)">${s.rollFull}</span>
+          ${letterInfo}
         </div>
-        <div style="font-size:11px;color:var(--gray-400)">ID: ${d.id}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span style="font-size:11px;color:var(--gray-600)">${semLabels.join(', ')}</span>
+          <span style="font-size:10px;color:var(--gray-400)">${debarDate}</span>
+          <span style="font-size:13px;color:var(--gray-400)">⌄</span>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:10px">
-        <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Debarred Semester(s)</span><br/>
-          <strong style="color:var(--danger)">${semLabels.join(', ')}</strong>
+      <div id="${cardId}" style="display:none;padding:0 13px 12px;border-top:1px solid ${d.active ? '#f5c6c6' : 'var(--gray-200)'}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin:10px 0 8px">
+          <div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Debarred Semester(s)</span><br/><strong style="color:var(--danger)">${semLabels.join(', ')}</strong></div>
+          <div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Fee Impact</span><br/>
+            ${d.feeWaived === false
+              ? `<span style="color:var(--danger);font-weight:600">✗ Fee retained — still due</span>`
+              : `<span style="color:var(--success);font-weight:600">✓ Session fee waived</span>`}
+          </div>
+          <div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Debarred On</span><br/>${debarDate}</div>
+          ${restoreDate ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Lifted On</span><br/>${restoreDate}</div>` : ''}
+          ${d.letterNo ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Office Order No.</span><br/><strong>${d.letterNo}</strong></div>` : ''}
+          ${d.letterDate ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Order Date</span><br/>${new Date(d.letterDate).toLocaleDateString('en-IN')}</div>` : ''}
         </div>
-        <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Fee Impact</span><br/>
-          ${d.feeWaived === false
-            ? `<span style="color:var(--danger);font-weight:600">✗ Fee retained — still due</span>`
-            : `<span style="color:var(--success);font-weight:600">✓ Session fee waived</span>`
-          }
-        </div>
-        <div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Debarred On</span><br/>
-          ${debarDate}
-        </div>
-        ${restoreDate ? `<div><span style="color:var(--gray-600);font-size:11px;font-weight:600;text-transform:uppercase">Lifted On</span><br/>${restoreDate}</div>` : ''}
+        <div style="font-size:12px;color:var(--gray-800);background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:7px 10px;margin-bottom:8px"><strong>Reason:</strong> ${d.reason || '—'}</div>
+        ${d.restoreReason ? `<div style="font-size:11px;color:var(--success);margin-bottom:8px"><strong>Restore note:</strong> ${d.restoreReason}</div>` : ''}
+        <div style="font-size:10px;color:var(--gray-400);margin-bottom:8px">ID: ${d.id}</div>
+        ${d.active ? `<button class="btn btn-secondary btn-sm" onclick="doUndebarStudent('${s.rollFull}','${d.id}','${(s.name||'').replace(/'/g,"\\'")}')">✅ Lift Debarment</button>` : ''}
       </div>
-      <div style="font-size:13px;color:var(--gray-800);background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px">
-        <strong>Reason:</strong> ${d.reason || '—'}
-      </div>
-      ${d.restoreReason ? `<div style="font-size:12px;color:var(--success);margin-bottom:10px"><strong>Restore note:</strong> ${d.restoreReason}</div>` : ''}
-      ${d.active ? `
-        <button class="btn btn-secondary btn-sm" onclick="doUndebarStudent('${s.rollFull}','${d.id}','${(s.name||'').replace(/'/g,"\\'")}')">
-          ✅ Lift Debarment
-        </button>` : ''}
     </div>`;
   }).join('');
 }
@@ -10299,6 +10569,384 @@ function generateLeaveReport(format) {
 
   XLSX.writeFile(wb, `Leave_Report_${session.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
   toast('Leave report downloaded.', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REPORT 4 — STUDENT FINES REGISTER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let _rpt4Data = []; // flat array of {student, fine, fineIndex}
+
+async function loadFinesReport() {
+  const btn = document.getElementById('btn-load-rpt4');
+  const st  = document.getElementById('rpt4-load-status');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Loading…';
+  if(st) st.textContent = '';
+
+  const r = await callBackend('getAllStudents');
+  btn.disabled = false; btn.innerHTML = '🔄 Load / Refresh Report';
+
+  if(!r.success) {
+    if(st) st.innerHTML = `<span style="color:var(--danger)">Failed: ${r.error||''}</span>`;
+    return;
+  }
+
+  _rpt4Data = [];
+  (r.students||[]).forEach(s => {
+    (s.fines||[]).forEach((f, i) => {
+      _rpt4Data.push({ student: s, fine: f, fineIndex: i });
+    });
+  });
+
+  renderFinesReport();
+  if(st) st.innerHTML = `<span style="color:var(--success)">✅ Loaded ${_rpt4Data.length} fine record(s)</span>`;
+}
+
+function renderFinesReport() {
+  const wrap = document.getElementById('rpt4-table-wrap');
+  if(!wrap) return;
+  if(!_rpt4Data.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">No fine records found. Click <strong>Load Report</strong>.</div>';
+    return;
+  }
+
+  const rollF     = (document.getElementById('rpt4-filter-roll')?.value||'').toLowerCase();
+  const catF      = (document.getElementById('rpt4-filter-category')?.value||'').toLowerCase();
+  const statusF   = document.getElementById('rpt4-filter-status')?.value || '';
+
+  let rows = _rpt4Data.filter(({student: s, fine: f}) => {
+    if(rollF && !s.rollFull.toLowerCase().includes(rollF) && !s.name.toLowerCase().includes(rollF)) return false;
+    if(catF && !(f.form||'').toLowerCase().includes(catF)) return false;
+    if(statusF === 'outstanding' && (f.revoked || f.paid)) return false;
+    if(statusF === 'paid'        && !(f.paid && f.paymentVerified)) return false;
+    if(statusF === 'pending'     && !(f.paid && !f.paymentVerified && !f.revoked)) return false;
+    if(statusF === 'revoked'     && !f.revoked) return false;
+    return true;
+  });
+
+  // Sort: outstanding first, then by imposedAt desc
+  rows.sort((a, b) => {
+    const aOut = !a.fine.revoked && !a.fine.paid ? 0 : 1;
+    const bOut = !b.fine.revoked && !b.fine.paid ? 0 : 1;
+    if(aOut !== bOut) return aOut - bOut;
+    return new Date(b.fine.imposedAt||0) - new Date(a.fine.imposedAt||0);
+  });
+
+  // Summary
+  const totalImposed    = rows.reduce((s,r) => s + Number(r.fine.amount||0), 0);
+  const totalCollected  = rows.filter(r => r.fine.paid && r.fine.paymentVerified && !r.fine.revoked)
+                              .reduce((s,r) => s + Number(r.fine.amount||0), 0);
+  const totalOutstanding = rows.filter(r => !r.fine.revoked && !r.fine.paid)
+                               .reduce((s,r) => s + Number(r.fine.amount||0), 0);
+
+  document.getElementById('rpt4-sum-total').textContent       = rows.length;
+  document.getElementById('rpt4-sum-imposed').textContent     = '₹' + totalImposed.toLocaleString('en-IN');
+  document.getElementById('rpt4-sum-collected').textContent   = '₹' + totalCollected.toLocaleString('en-IN');
+  document.getElementById('rpt4-sum-outstanding').textContent = '₹' + totalOutstanding.toLocaleString('en-IN');
+  document.getElementById('rpt4-summary').style.display       = 'block';
+  document.getElementById('rpt4-count').textContent           = rows.length + ' record(s)';
+
+  if(!rows.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">No records match the current filters.</div>';
+    return;
+  }
+
+  const COLS = ['#','Roll No.','Student Name','Hostel','Room','Category','Reason',
+                'Amount','Imposed On','Office Order No.','Order Date',
+                'Payment Status','Paid On','Revoked','Revoke Order No.','Revoke Order Date'];
+  let html = `<table class="data-table" style="min-width:1400px">
+    <thead><tr>${COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+
+  rows.forEach(({student: s, fine: f}, idx) => {
+    const hi = s.hostelInfo||{};
+    const imposedDate = f.imposedAt ? new Date(f.imposedAt).toLocaleDateString('en-IN') : (f.date||'—');
+    const orderDate   = f.letterDate ? new Date(f.letterDate).toLocaleDateString('en-IN') : '—';
+    const paidDate    = f.paidAt     ? new Date(f.paidAt).toLocaleDateString('en-IN')     : '—';
+    const revokeDate  = f.revokeLetterDate ? new Date(f.revokeLetterDate).toLocaleDateString('en-IN') : '—';
+
+    let statusBadge;
+    if(f.revoked) {
+      statusBadge = `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--success-bg);color:var(--success);border:1px solid var(--success)">Revoked</span>`;
+    } else if(f.paid && f.paymentVerified) {
+      statusBadge = `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--success-bg);color:var(--success)">Paid ✓</span>`;
+    } else if(f.paid && !f.paymentVerified) {
+      statusBadge = `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--warning-bg);color:var(--warning)">Pending Verification</span>`;
+    } else {
+      statusBadge = `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--danger-bg);color:var(--danger)">Outstanding</span>`;
+    }
+
+    const rowBg = f.revoked ? '' : (!f.paid ? 'background:#fff5f5' : '');
+
+    html += `<tr style="${rowBg}">
+      <td style="color:var(--gray-400);font-size:12px">${idx+1}</td>
+      <td style="font-weight:600;color:var(--navy)">${s.rollFull}</td>
+      <td>${s.name}</td>
+      <td>${hi.hostel||'—'}</td>
+      <td>${hi.roomNo||'—'}</td>
+      <td style="font-size:12px">${f.form||'—'}</td>
+      <td style="font-size:12px;max-width:160px">${f.reason||'—'}</td>
+      <td style="font-weight:700;color:var(--danger)">₹${Number(f.amount||0).toLocaleString('en-IN')}</td>
+      <td style="font-size:12px">${imposedDate}</td>
+      <td style="font-size:12px">${f.letterNo||'—'}</td>
+      <td style="font-size:12px">${orderDate}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px">${f.paid ? paidDate : '—'}</td>
+      <td style="font-size:12px">${f.revoked ? '✓' : '—'}</td>
+      <td style="font-size:12px">${f.revokeLetterNo||'—'}</td>
+      <td style="font-size:12px">${revokeDate}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  window._rpt4Filtered = rows;
+}
+
+function clearRpt4Filters() {
+  ['rpt4-filter-roll'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  const cat = document.getElementById('rpt4-filter-category'); if(cat) cat.value='';
+  const st  = document.getElementById('rpt4-filter-status');   if(st)  st.value='';
+  renderFinesReport();
+}
+
+function generateFinesReport(format) {
+  const rows = window._rpt4Filtered;
+  if(!rows || !rows.length) { toast('Load the report first.', 'error'); return; }
+  const genDate = new Date().toLocaleDateString('en-IN');
+
+  if(format === 'pdf') {
+    _printReport('rpt4-table-wrap', 'Student Fines Register', 'All Sessions', _rptInstituteName(), genDate);
+    return;
+  }
+
+  const headers = ['S.No','Roll No.','Student Name','Hostel','Room','Category','Reason',
+                   'Amount (₹)','Imposed On','Office Order No.','Order Date',
+                   'Payment Status','Paid On','Revoked','Revoke Order No.','Revoke Order Date'];
+  const data = rows.map(({student: s, fine: f}, i) => {
+    const hi = s.hostelInfo||{};
+    const payStatus = f.revoked ? 'Revoked' : (f.paid && f.paymentVerified) ? 'Paid & Verified'
+                    : f.paid ? 'Pending Verification' : 'Outstanding';
+    return [
+      i+1, s.rollFull, s.name, hi.hostel||'', hi.roomNo||'',
+      f.form||'', f.reason||'', Number(f.amount||0),
+      f.imposedAt ? new Date(f.imposedAt).toLocaleDateString('en-IN') : (f.date||''),
+      f.letterNo||'',
+      f.letterDate ? new Date(f.letterDate).toLocaleDateString('en-IN') : '',
+      payStatus,
+      f.paidAt ? new Date(f.paidAt).toLocaleDateString('en-IN') : '',
+      f.revoked ? 'Yes' : 'No',
+      f.revokeLetterNo||'',
+      f.revokeLetterDate ? new Date(f.revokeLetterDate).toLocaleDateString('en-IN') : ''
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['Student Fines Register — ' + _rptInstituteName()],
+    ['Generated on: ' + genDate],
+    [],
+    headers,
+    ...data
+  ]);
+  ws['!cols'] = headers.map((_,i) => ({wch:[6,14,22,10,8,18,22,12,14,18,14,22,14,8,18,14][i]||14}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Fines Register');
+  XLSX.writeFile(wb, `Fines_Register_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Fines report downloaded.', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REPORT 5 — ALUMNI STUDENTS LIST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let _rpt5Data = [];
+
+async function loadAlumniReport() {
+  const btn = document.getElementById('btn-load-rpt5');
+  const st  = document.getElementById('rpt5-load-status');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Loading…';
+  if(st) st.textContent = '';
+
+  const r = await callBackend('getAllStudents');
+  btn.disabled = false; btn.innerHTML = '🔄 Load / Refresh Report';
+
+  if(!r.success) {
+    if(st) st.innerHTML = `<span style="color:var(--danger)">Failed: ${r.error||''}</span>`;
+    return;
+  }
+
+  _rpt5Data = (r.students||[]).filter(s => s.status === 'alumni');
+
+  renderAlumniReport();
+  if(st) st.innerHTML = `<span style="color:var(--success)">✅ Loaded ${_rpt5Data.length} alumni record(s)</span>`;
+}
+
+function renderAlumniReport() {
+  const wrap = document.getElementById('rpt5-table-wrap');
+  if(!wrap) return;
+  if(!_rpt5Data.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">No alumni records found. Click <strong>Load Report</strong>.</div>';
+    return;
+  }
+
+  const rollF    = (document.getElementById('rpt5-filter-roll')?.value||'').toLowerCase();
+  const hostelF  = (document.getElementById('rpt5-filter-hostel')?.value||'').toLowerCase();
+  const noDuesF  = document.getElementById('rpt5-filter-nodues')?.value || '';
+  const sortF    = document.getElementById('rpt5-sort')?.value || 'name';
+
+  let rows = _rpt5Data.filter(s => {
+    if(rollF   && !s.rollFull.toLowerCase().includes(rollF) && !s.name.toLowerCase().includes(rollF)) return false;
+    if(hostelF && !(s.hostelInfo?.hostel||'').toLowerCase().includes(hostelF)) return false;
+    const dl = getDriveLinks ? getDriveLinks(s) : (s.driveLinks||{});
+    const hasNoDues = !!(dl.noDuesRef || dl.noDuesLetter || s.noDuesRef);
+    if(noDuesF === 'issued'     && !hasNoDues) return false;
+    if(noDuesF === 'not_issued' &&  hasNoDues) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    if(sortF === 'roll')    return (a.rollFull||'').localeCompare(b.rollFull||'');
+    if(sortF === 'vacated') {
+      const da = getDriveLinks ? (getDriveLinks(a).alumniDate||'') : '';
+      const db = getDriveLinks ? (getDriveLinks(b).alumniDate||'') : '';
+      return new Date(db||0) - new Date(da||0);
+    }
+    return (a.name||'').localeCompare(b.name||'');
+  });
+
+  // Summary
+  const noDuesCount   = rows.filter(s => { const dl=getDriveLinks?getDriveLinks(s):(s.driveLinks||{}); return !!(dl.noDuesRef||dl.noDuesLetter||s.noDuesRef); }).length;
+  const cautionCount  = rows.filter(s => { const dl=getDriveLinks?getDriveLinks(s):(s.driveLinks||{}); return !!dl.cautionRefunded; }).length;
+
+  document.getElementById('rpt5-sum-total').textContent   = rows.length;
+  document.getElementById('rpt5-sum-nodues').textContent  = noDuesCount;
+  document.getElementById('rpt5-sum-pending').textContent = rows.length - noDuesCount;
+  document.getElementById('rpt5-sum-caution').textContent = cautionCount;
+  document.getElementById('rpt5-summary').style.display   = 'block';
+  document.getElementById('rpt5-count').textContent       = rows.length + ' alumni';
+
+  if(!rows.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">No records match the current filters.</div>';
+    return;
+  }
+
+  const COLS = ['#','Roll No.','Student Name','Branch','Hostel','Room No.',
+                'Admission Session','Last Session','No. of Sessions',
+                'Total Fee Paid','Outstanding Fines',
+                'No Dues Status','No Dues Ref.','Caution Money Refunded','Vacated On'];
+  let html = `<table class="data-table" style="min-width:1300px">
+    <thead><tr>${COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+
+  rows.forEach((s, idx) => {
+    const hi = s.hostelInfo || {};
+    const dl = getDriveLinks ? getDriveLinks(s) : (s.driveLinks||{});
+    const payments = Array.isArray(s.payments) ? s.payments : [];
+    const fines    = Array.isArray(s.fines)    ? s.fines    : [];
+
+    // Total fee paid = sum of all approved payments
+    const totalFeePaid = payments
+      .filter(p => p.status === 'approved')
+      .reduce((sum, p) => sum + Number(p.amount||0), 0);
+
+    // Outstanding fines = unpaid, non-revoked fines
+    const outstandingFine = fines
+      .filter(f => !f.revoked && !f.paid)
+      .reduce((sum, f) => sum + Number(f.amount||0), 0);
+
+    // Sessions attended
+    const approvedSessions = [...new Set(
+      payments.filter(p => p.paymentType === 'semesterFee' && p.status === 'approved')
+              .map(p => String(p.sessionId||p.semester||'').trim()).filter(Boolean)
+    )];
+
+    const admDate   = s.admissionDate || (payments[0]?.paidAt ? new Date(payments[0].paidAt).toLocaleDateString('en-IN') : '—');
+    const vacatedOn = dl.alumniDate ? new Date(dl.alumniDate).toLocaleDateString('en-IN') : '—';
+    const hasNoDues = !!(dl.noDuesRef || dl.noDuesLetter || s.noDuesRef);
+    const noDuesBadge = hasNoDues
+      ? `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--success-bg);color:var(--success)">✓ Issued</span>`
+      : `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--warning-bg);color:var(--warning)">Pending</span>`;
+    const cautionBadge = dl.cautionRefunded
+      ? `<span style="font-size:12px;color:var(--success);font-weight:600">✓ Refunded</span>`
+      : `<span style="font-size:12px;color:var(--gray-400)">—</span>`;
+
+    html += `<tr>
+      <td style="color:var(--gray-400);font-size:12px">${idx+1}</td>
+      <td style="font-weight:600;color:var(--navy)">${s.rollFull}</td>
+      <td>${s.name}</td>
+      <td style="font-size:12px">${s.branch||s.course||'—'}</td>
+      <td style="font-size:12px">${hi.hostel||'—'}</td>
+      <td style="font-size:12px">${hi.roomNo||'—'}</td>
+      <td style="font-size:12px">${s.admissionSession||admDate}</td>
+      <td style="font-size:12px">${approvedSessions[approvedSessions.length-1]||'—'}</td>
+      <td style="text-align:center;font-weight:700">${approvedSessions.length}</td>
+      <td style="font-weight:700;color:var(--success)">₹${totalFeePaid.toLocaleString('en-IN')}</td>
+      <td style="font-weight:700;color:${outstandingFine>0?'var(--danger)':'var(--gray-400)'}">
+        ${outstandingFine > 0 ? '₹'+outstandingFine.toLocaleString('en-IN') : '—'}
+      </td>
+      <td>${noDuesBadge}</td>
+      <td style="font-size:12px">${dl.noDuesRef||s.noDuesRef||'—'}</td>
+      <td>${cautionBadge}</td>
+      <td style="font-size:12px">${vacatedOn}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  window._rpt5Filtered = rows;
+}
+
+function clearRpt5Filters() {
+  ['rpt5-filter-roll','rpt5-filter-hostel'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const nd = document.getElementById('rpt5-filter-nodues'); if(nd) nd.value='';
+  renderAlumniReport();
+}
+
+function generateAlumniReport(format) {
+  const rows = window._rpt5Filtered;
+  if(!rows || !rows.length) { toast('Load the report first.', 'error'); return; }
+  const genDate = new Date().toLocaleDateString('en-IN');
+
+  if(format === 'pdf') {
+    _printReport('rpt5-table-wrap', 'Alumni Students List', 'All Sessions', _rptInstituteName(), genDate);
+    return;
+  }
+
+  const headers = ['S.No','Roll No.','Student Name','Branch','Hostel','Room No.',
+                   'Admission Session','Last Session','No. of Sessions',
+                   'Total Fee Paid (₹)','Outstanding Fines (₹)',
+                   'No Dues Status','No Dues Ref.','Caution Refunded','Vacated On'];
+  const data = rows.map((s, i) => {
+    const hi = s.hostelInfo||{};
+    const dl = getDriveLinks ? getDriveLinks(s) : (s.driveLinks||{});
+    const payments = Array.isArray(s.payments) ? s.payments : [];
+    const fines    = Array.isArray(s.fines)    ? s.fines    : [];
+    const totalFeePaid    = payments.filter(p=>p.status==='approved').reduce((sum,p)=>sum+Number(p.amount||0),0);
+    const outstandingFine = fines.filter(f=>!f.revoked&&!f.paid).reduce((sum,f)=>sum+Number(f.amount||0),0);
+    const approvedSessions = [...new Set(payments.filter(p=>p.paymentType==='semesterFee'&&p.status==='approved').map(p=>String(p.sessionId||p.semester||'').trim()).filter(Boolean))];
+    return [
+      i+1, s.rollFull, s.name, s.branch||s.course||'',
+      hi.hostel||'', hi.roomNo||'',
+      s.admissionSession||'', approvedSessions[approvedSessions.length-1]||'',
+      approvedSessions.length,
+      totalFeePaid, outstandingFine,
+      (dl.noDuesRef||dl.noDuesLetter||s.noDuesRef) ? 'Issued' : 'Pending',
+      dl.noDuesRef||s.noDuesRef||'',
+      dl.cautionRefunded ? 'Yes' : 'No',
+      dl.alumniDate ? new Date(dl.alumniDate).toLocaleDateString('en-IN') : ''
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['Alumni Students List — ' + _rptInstituteName()],
+    ['Generated on: ' + genDate],
+    [],
+    headers,
+    ...data
+  ]);
+  ws['!cols'] = headers.map((_,i)=>({wch:[6,14,22,12,10,8,16,16,10,16,16,14,18,14,14][i]||14}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Alumni List');
+  XLSX.writeFile(wb, `Alumni_List_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Alumni report downloaded.', 'success');
 }
 
 // ── PDF / PRINT ───────────────────────────────────────────────────────────────
