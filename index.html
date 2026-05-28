@@ -1061,6 +1061,17 @@
       <!-- Leave Requests Tab -->
       <div id="wr-tab-leaves" class="hidden">
         <div class="section-heading">Pending Leave Requests</div>
+        <div id="wr-bulk-approve-bar" style="background:#eef3ff;border:1px solid #c5d3f0;border-radius:8px;padding:12px 14px;margin-bottom:14px;display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-weight:700;font-size:13px;color:#1a3a7c">⚡ Bulk Approve All Pending</div>
+              <div id="wr-bulk-pending-count" style="font-size:12px;color:#555;margin-top:2px"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openBulkApproveModal()" style="font-size:12px;white-space:nowrap">
+              🔑 Approve All with Key
+            </button>
+          </div>
+        </div>
         <div id="wr-leave-list"><p style="color:var(--gray-400);font-size:13px">Loading…</p></div>
         <hr class="divider"/>
         <div class="section-heading" style="margin-top:4px">All Leave Applications</div>
@@ -7605,6 +7616,12 @@ async function loadWardenLeaves() {
   if(badge){badge.textContent=pending.length;badge.style.display=pending.length?'':' none';}
   renderWardenStats();
 
+  // Show / hide bulk approve bar
+  const bulkBar = document.getElementById('wr-bulk-approve-bar');
+  const bulkCount = document.getElementById('wr-bulk-pending-count');
+  if(bulkBar) { bulkBar.style.display = pending.length >= 2 ? '' : 'none'; }
+  if(bulkCount) { bulkCount.textContent = pending.length + ' pending request(s) will be approved at once'; }
+
   const makeLeaveRow=(l,showActions)=>{ 
     const statusClass=l.status==='approved'?'badge-approved':l.status==='rejected'?'badge-rejected':'badge-pending';
     const actions=showActions?`
@@ -7655,6 +7672,82 @@ async function decideLeave(leaveId, decision, reason) {
   } else {
     toast('Failed: '+(r.error||''),'error');
   }
+}
+
+// ── BULK APPROVE ALL PENDING LEAVES ─────────────────────────────────────────
+async function openBulkApproveModal() {
+  const pending = wrLeavesCache.filter(l => l.status === 'pending');
+  if (!pending.length) { toast('No pending leave requests to approve.', 'info'); return; }
+
+  const listHtml = pending.map(l =>
+    `<div style="padding:4px 0;border-bottom:1px solid #e8edf5;font-size:12px">
+      <span style="font-weight:600">${l.studentName}</span>
+      <span style="color:#555"> (${l.rollFull}) · ${fmtDMY(l.departureDt)}→${fmtDMY(l.returnDt)} (${l.totalDays}d) · <em>${l.reason}</em></span>
+    </div>`
+  ).join('');
+
+  // Build inline modal
+  const overlay = document.createElement('div');
+  overlay.id = 'bulk-approve-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,39,68,.55);z-index:9200;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0;font-size:17px;color:#0f2744">⚡ Bulk Approve Leaves</h3>
+        <button onclick="document.getElementById('bulk-approve-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+      </div>
+      <div style="background:#fff8e1;border:1px solid #f5c942;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#6b4c00">
+        ⚠️ This will <strong>approve all ${pending.length} pending leave request(s)</strong> at once and generate a PDF for each. This cannot be undone.
+      </div>
+      <div style="font-size:12px;font-weight:600;color:#1a3a7c;margin-bottom:6px">Requests to be approved:</div>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:6px;padding:6px 10px;background:#fafafa;margin-bottom:14px">
+        ${listHtml}
+      </div>
+      <label style="display:block;font-size:12px;font-weight:600;color:#0f2744;margin-bottom:5px">🔑 Bulk Approval Key</label>
+      <input type="password" id="bulk-key-input" placeholder="Enter bulk_approve_key (or warden password)"
+        style="width:100%;padding:9px 11px;border:1.5px solid #c5d3f0;border-radius:7px;font-size:13px;box-sizing:border-box;margin-bottom:5px"
+        onkeydown="if(event.key==='Enter')runBulkApproveLeaves()"/>
+      <div style="font-size:11px;color:#888;margin-bottom:14px">
+        Set <code>bulk_approve_key</code> in Config sheet, or use your warden password as a fallback.
+      </div>
+      <div id="bulk-approve-err" style="color:#c0392b;font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('bulk-approve-overlay').remove()" class="btn btn-secondary btn-sm">Cancel</button>
+        <button id="bulk-approve-confirm-btn" onclick="runBulkApproveLeaves()" class="btn btn-success btn-sm">✓ Approve All ${pending.length} Now</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => { const inp = document.getElementById('bulk-key-input'); if(inp) inp.focus(); }, 80);
+}
+
+async function runBulkApproveLeaves() {
+  const key = (document.getElementById('bulk-key-input') || {}).value || '';
+  const errEl = document.getElementById('bulk-approve-err');
+  const btn   = document.getElementById('bulk-approve-confirm-btn');
+  if (!key.trim()) {
+    if(errEl) { errEl.textContent = 'Bulk approval key is required.'; errEl.style.display = ''; }
+    return;
+  }
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ Approving…'; }
+  if(errEl) errEl.style.display = 'none';
+  toast('Processing bulk approval… please wait.', 'info');
+
+  const r = await callBackend('bulkApproveLeaves', { bulkKey: key.trim(), dryRun: false });
+
+  const overlay = document.getElementById('bulk-approve-overlay');
+  if (overlay) overlay.remove();
+
+  if (!r.success) {
+    toast('Bulk approve failed: ' + (r.error || 'Unknown error'), 'error');
+    return;
+  }
+
+  const approved = (r.approved || []).length;
+  const failed   = (r.failed   || []).length;
+  let msg = '✅ ' + approved + ' leave(s) approved!';
+  if (failed) { msg += ' ⚠ ' + failed + ' failed — check GAS logs.'; console.warn('Bulk approve failures:', r.failed); }
+  toast(msg, failed ? 'error' : 'success');
+  await loadWardenLeaves();
 }
 function promptRejectLeave(leaveId) {
   openReasonModal({
