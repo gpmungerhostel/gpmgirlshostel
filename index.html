@@ -1325,6 +1325,14 @@
               🎓 Activate New Session
             </button>
             <div style="font-size:11px;color:var(--gray-400);margin-top:6px">A confirmation dialog will appear before this action is committed.</div>
+            <!-- HDN batch button — shown after activation or for manual re-issue -->
+            <div id="hdn-manual-wrap" style="margin-top:12px;padding:10px 14px;background:var(--blue-50,#eff6ff);border:1px solid var(--blue-200,#bfdbfe);border-radius:6px">
+              <div style="font-size:12px;font-weight:600;color:#1e40af;margin-bottom:6px">📋 Hostel Fee Demand Notices (HDN)</div>
+              <div style="font-size:11px;color:#374151;margin-bottom:8px">HDN notices are automatically generated when a session is activated. Use the button below to manually issue / re-issue notices to any eligible students who may have been missed.</div>
+              <button class="btn btn-secondary" onclick="issueHDNBatch()" id="btn-hdn-batch" style="font-size:12px;font-weight:600">
+                📋 Issue / Re-issue HDN to All Eligible Students
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2544,7 +2552,6 @@ function _renderSection(name) {
   if(name === 'continuing') {
     if(csStudent) {
       renderStudentProfile();
-      loadMyLeaves();
       csTab('info');  // reset to the first tab so the view is fresh
     }
   }
@@ -2794,6 +2801,42 @@ function semLabel(val) {
   if(!isNaN(n) && n > 0 && String(n) === s) return 'Session #' + n;
   // Any other string — append Session suffix
   return s + ' Session';
+}
+
+/**
+ * Bug Fix (admissionSession vs currentSession):
+ * admissionSession = the session the student was ORIGINALLY admitted under (immutable).
+ * semesterNo       = the CURRENT/LATEST approved session (updated on each approval).
+ *
+ * After the GS backend fix, approveStudent no longer overwrites admissionSession.
+ * But older records may have admissionSession already set to the latest session.
+ * This helper returns the true "current session" for fee-due calculations:
+ *   1. Latest approved semesterFee payment's semester, if any.
+ *   2. Else semesterNo (backend keeps this in sync with latest approval).
+ *   3. Else admissionSession (first admission, not yet renewed).
+ *
+ * Use admissionSession only for display ("Admitted in…"), never for fee calculations.
+ * Use currentSessionOf(s) for "what session fee is due now / was last paid".
+ */
+function currentSessionOf(s) {
+  const payments = Array.isArray(s.payments) ? s.payments : [];
+  const approved = payments
+    .filter(p => p.paymentType === 'semesterFee' && p.status === 'approved' && p.semester)
+    .map(p => String(p.semester).trim());
+  if(approved.length) return approved[approved.length - 1];
+  return String(s.semesterNo || s.admissionSession || '').trim();
+}
+
+/**
+ * Returns the original admission session for a student.
+ * Handles legacy records where admissionSession may hold a bare numeric like "1"
+ * (stored before the session-string migration). Falls back to semesterNo.
+ */
+function admissionSessionOf(s) {
+  const raw = String(s.admissionSession || '').trim();
+  const isLegacyNumeric = raw !== '' && !isNaN(Number(raw)) && Number(raw) < 100;
+  if(!raw || isLegacyNumeric) return String(s.semesterNo || '').trim();
+  return raw;
 }
 
 /**
@@ -3181,20 +3224,7 @@ function renderStudentProfile() {
     document.getElementById('cs-allot').after(notice);
   }
 
-  // Document download links (allotment letter, no dues, provisional letter etc.)
-  const docDiv = document.getElementById('cs-doc-links');
-  if(docDiv) {
-    const dl = getDriveLinks(s);
-    const docLinks = [];
-    if(dl.provisionalLetter) docLinks.push(`<a href="${dl.provisionalLetter}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px">📋 Provisional Allotment Letter</a>`);
-    if(dl.allotmentLetter)   docLinks.push(`<a href="${dl.allotmentLetter}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px">📄 Allotment Letter</a>`);
-    if(dl.noDuesCert)        docLinks.push(`<a href="${dl.noDuesCert}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px">📄 No Dues Certificate</a>`);
-    if(docLinks.length) {
-      docDiv.innerHTML=`<div style="border-top:1px solid var(--gray-100);margin-top:14px;padding-top:12px"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--gray-600);margin-bottom:8px">My Documents</div><div style="display:flex;gap:8px;flex-wrap:wrap">${docLinks.join('')}</div></div>`;
-    } else {
-      docDiv.innerHTML='';
-    }
-  }
+  // Document download links rendered by renderStudentDocLinks(s) called below
 
   // Allotment chips
   if(s.hostelInfo && s.hostelInfo.roomNo) {
@@ -3207,21 +3237,33 @@ function renderStudentProfile() {
   }
 
   // Info grid
-  // FIX: Admission Session — derive from the latest approved semesterFee payment if
-  // available, since admissionSession/semesterNo may hold a legacy numeric value like "1".
+  // BUG FIX (Session display): Always show the ORIGINAL admission session from
+  // s.admissionSession (now immutable after first approval — never overwritten on renewal).
+  // Current/active session uses s.semesterNo (updated on each approval) or latest payment.
+  // Legacy guard: if admissionSession holds a bare numeric like '1', fall back to semesterNo.
+  const _csAdmRaw = String(s.admissionSession || '').trim();
+  const _csAdmIsLegacy = _csAdmRaw !== '' && !isNaN(Number(_csAdmRaw)) && Number(_csAdmRaw) < 100;
+  const _csAdmSessionDisplay = (!_csAdmRaw || _csAdmIsLegacy)
+    ? semLabel(s.semesterNo || '')
+    : semLabel(_csAdmRaw);
+  // Current session = latest approved semesterFee payment session, else semesterNo
   const _csApprovedSessions = (Array.isArray(s.payments)?s.payments:[])
     .filter(p => p.status === 'approved' && p.paymentType === 'semesterFee' && p.semester);
-  const _csSessionDisplay = _csApprovedSessions.length
+  const _csCurrentSessionDisplay = _csApprovedSessions.length
     ? semLabel(String(_csApprovedSessions[_csApprovedSessions.length-1].semester))
-    : semLabel(s.admissionSession || s.semesterNo || '');
+    : semLabel(s.semesterNo || s.admissionSession || '');
+  // Only show 'Current Session' row if it differs from admission session (i.e. student has renewed)
+  const _csShowCurrentSep = _csCurrentSessionDisplay && _csCurrentSessionDisplay !== _csAdmSessionDisplay;
   document.getElementById('cs-info-grid').innerHTML = [
     ['Date of Birth', formatDOB(s.dob)],['Email', s.email],
     ['Contact', s.contactNo],['Guardian Contact', s.guardianContact],
-    ['Guardian', s.guardianName],['Admission Session', _csSessionDisplay],
+    ['Guardian', s.guardianName],
+    ['Admission Session', _csAdmSessionDisplay],
+    _csShowCurrentSep ? ['Current Session', _csCurrentSessionDisplay] : null,
     ['District / PIN', (s.district||'—')+' — '+( s.pin||'—')],
     ['Permanent Address', (s.address||'—')+(s.district?', '+(s.district||''):'')+(s.pin?', PIN '+(s.pin||''):'')],
     ['Submitted', s.submittedAt ? new Date(s.submittedAt).toLocaleDateString('en-IN') : '—']
-  ].map(([k,v])=>`<div class="info-item"><div class="key">${k}</div><div class="val">${v||'—'}</div></div>`).join('');
+  ].filter(Boolean).map(([k,v])=>`<div class="info-item"><div class="key">${k}</div><div class="val">${v||'—'}</div></div>`).join('');
 
   // Pre-fill update
   document.getElementById('cs-upd-contact').value = s.contactNo||'';
@@ -3692,7 +3734,10 @@ function renderOutstandingDues(s) {
   //    admissionSession here would show a stale/wrong old session due.
   const isRenewalStudentDues = !!(s.hostelInfo && s.hostelInfo.roomNo);
   if((s.status === 'provisional' || s.status === 'pending') && !isRenewalStudentDues) {
-    const semNo = String(s.admissionSession || s.semesterNo || '');
+    // BUG FIX: Use semesterNo (current approved session) first; admissionSession is
+    // the original admission session and is now preserved separately (never overwritten).
+    // For a brand-new student both are the same, so order here doesn't matter.
+    const semNo = String(s.semesterNo || s.admissionSession || '');
     const alreadyCovered = payments.some(p => p.paymentType === 'semesterFee_due' && String(p.sessionId||p.semester||'') === semNo);
     if(!alreadyCovered) {
       const semApproved = isApprovedFor('semesterFee', semNo);
@@ -4057,7 +4102,10 @@ function renderPaymentActions(s) {
   const isNewStudentPay = (s.status === 'provisional' || s.status === 'pending') && !isRenewalStudent;
   if(isNewStudentPay) {
     // Semester fee (no semesterFee_due marker needed for new students)
-    const admSem = String(s.admissionSession || s.semesterNo || '');
+    // BUG FIX: semesterNo holds the current/active session (updated on each approval).
+    // admissionSession is the original admission year (preserved after the backend fix).
+    // For new students both are identical; prefer semesterNo for forward compatibility.
+    const admSem = String(s.semesterNo || s.admissionSession || '');
     const alreadyCovered = payableItems.some(it => it.paymentType === 'semesterFee' && it.semester === admSem);
     if(!alreadyCovered) {
       const existingApproved = payments.find(p => p.paymentType === 'semesterFee'
@@ -4517,6 +4565,17 @@ function csTab(name) {
   if(name === 'dues')      { renderDuesTab(); }
   if(name === 'leave')     { loadMyLeaves(); updateDaysPreview(); }
   if(name === 'grievance') { loadMyGrievances(); }
+  // Bug Fix 1 (HDN stale link): silently re-fetch csStudent in background whenever
+  // the student opens the Profile tab so any newly reissued documents (HDN, allotment
+  // letter) show up without the student needing to log out and back in.
+  if(name === 'info' && csStudent) {
+    callBackend('getStudent', {rollFull: csStudent.rollFull}).then(rd => {
+      if(rd && rd.success && rd.student) {
+        csStudent = rd.student;
+        renderStudentDocLinks(csStudent);
+      }
+    }).catch(()=>{/* silent — stale links still visible until next login */});
+  }
 }
 
 
@@ -5140,6 +5199,12 @@ async function openApprove(rollFull, viewOnly=false) {
       allotLetterBtnHtml = '<span style="font-size:12px;font-weight:600;color:var(--success);padding:8px 0;display:inline-block">✅ Allotment Letter Issued (Sem ' + _semLock.semester + ')</span>';
     }
 
+    // HDN button — show for approved/pending students only
+    let hdnBtnHtml = '';
+    if(['approved','pending'].includes(s.status)) {
+      hdnBtnHtml = '<button class="btn btn-secondary" onclick="issueHDNForStudent(\'' + s.rollFull + '\')" style="font-size:12px" title="Issue / Re-issue Hostel Fee Demand Notice for current session">📋 Issue HDN</button>';
+    }
+
     updateDiv.innerHTML = `
       <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
       <div class="section-heading">Update Accommodation Details</div>
@@ -5175,6 +5240,7 @@ async function openApprove(rollFull, viewOnly=false) {
           💾 Update Accommodation Details
         </button>
         ${allotLetterBtnHtml}
+        ${hdnBtnHtml}
       </div>`;
     // Append after wr-allot-form
     document.getElementById('wr-allot-form').after(updateDiv);
@@ -5247,6 +5313,7 @@ async function openApprove(rollFull, viewOnly=false) {
     if(driveLinks.provisionalLetter) linksHtml += `<a href="${driveLinks.provisionalLetter}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📋 Provisional Letter</a>`;
     if(driveLinks.allotmentLetter)   linksHtml += `<a href="${driveLinks.allotmentLetter}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Allotment Letter</a>`;
     if(driveLinks.noDuesCert)        linksHtml += `<a href="${driveLinks.noDuesCert}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 No Dues Certificate</a>`;
+    if(driveLinks.hdnLetterLatest)   linksHtml += `<a href="${driveLinks.hdnLetterLatest}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;background:var(--blue-50,#eff6ff);color:#1e40af;border-color:#bfdbfe">📋 Fee Demand Notice (HDN)</a>`;
     if(showRegenBtn) linksHtml += `<button class="btn btn-secondary btn-sm" style="font-size:11px;color:var(--warning)" onclick="regenProvisionalLetter('${s.rollFull}',this)">🔄 Re-generate Provisional Letter</button>`;
     linksHtml += '</div>';
     document.getElementById('wr-approve-info').innerHTML += `
@@ -5912,10 +5979,63 @@ async function initNewSemesterV2() {
     await callBackend('calcLateFines', {});
     loadDateWindows();
     loadWardenData(true);
+    // Show manual HDN re-issue button in case any were missed
+    const hdnBtnWrap = document.getElementById('hdn-manual-wrap');
+    if(hdnBtnWrap) hdnBtnWrap.style.display='';
   } else {
     if(resultEl) resultEl.innerHTML=`<div class="alert alert-danger">❌ ${r.error||'Failed to activate session.'}</div>`;
     toast('Error: '+(r.error||''),'error');
   }
+}
+
+async function issueHDNBatch() {
+  const btn = document.getElementById('btn-hdn-batch');
+  if(btn) { btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Issuing HDNs…'; }
+  const r = await callBackend('issueFeeDemandNotices', {force: true});
+  if(btn) { btn.disabled=false; btn.innerHTML='📋 Issue / Re-issue HDN to All Eligible Students'; }
+  const resultEl = document.getElementById('sem-init-result');
+  if(r.success) {
+    if(resultEl) resultEl.innerHTML=`<div class="alert alert-success">✅ HDN batch complete — ${r.message}</div>`;
+    toast('HDN batch done: issued='+r.issued,'success');
+  } else {
+    if(resultEl) resultEl.innerHTML=`<div class="alert alert-danger">❌ HDN batch failed: ${r.error}</div>`;
+    toast('HDN batch error','error');
+  }
+}
+
+async function issueHDNForStudent(rollFull) {
+  const r = await callBackend('issueFeeDemandNoticeForStudent', {rollFull});
+  if(r.success) {
+    toast('HDN issued for ' + rollFull + ' | Ref: ' + r.refNo, 'success');
+    // Bug Fix (HDN reissue): htmlToPDFAndSave trashes the old Drive file and creates a new
+    // one with a new URL. Update the in-memory warden student list entry so the warden panel
+    // reflects the new link immediately without a full page reload.
+    // NOTE: csStudent is the STUDENT-PORTAL user's object, not the warden's. We update the
+    // warden's cached list (wrStudents) instead. The student will get the fresh link on their
+    // next Profile tab visit (auto-refresh added to csTab('info')).
+    if(r.driveUrl) {
+      if(typeof wrStudents !== 'undefined' && Array.isArray(wrStudents)) {
+        const idx = wrStudents.findIndex(s => s.rollFull === rollFull);
+        if(idx >= 0) {
+          let dl = getDriveLinks(wrStudents[idx]);
+          dl.hdnLetterLatest = r.driveUrl;
+          wrStudents[idx].driveLinks = dl;
+        }
+      }
+      // Also update adStudents cache used in admin panel
+      if(typeof adStudents !== 'undefined' && Array.isArray(adStudents)) {
+        const idx2 = adStudents.findIndex(s => s.rollFull === rollFull);
+        if(idx2 >= 0) {
+          let dl2 = getDriveLinks(adStudents[idx2]);
+          dl2.hdnLetterLatest = r.driveUrl;
+          adStudents[idx2].driveLinks = dl2;
+        }
+      }
+    }
+  } else {
+    toast('HDN failed: ' + (r.error || 'unknown error'), 'error');
+  }
+  return r;
 }
 
 // ── PROVISIONAL APPROVE (new students — warden issues provisional allotment letter) ──
@@ -6058,7 +6178,9 @@ async function approveRenewal(rollFull, renewalSem) {
   if(r.success) {
     toast(`${semLabel(renewalSem)} renewal approved! Allotment letter issued. Ref: ${refNo}`, 'success');
     const idx = wrStudents.findIndex(x=>x.rollFull===rollFull);
-    if(idx>=0) { wrStudents[idx].status='approved'; wrStudents[idx].hostelInfo=hostelInfo; wrStudents[idx].renewalSemester=''; wrStudents[idx].admissionSession=String(renewalSem); wrStudents[idx].semesterNo=String(renewalSem); }
+    // Bug Fix: only update semesterNo (current session), NOT admissionSession.
+    // admissionSession is the original admission year and must remain immutable.
+    if(idx>=0) { wrStudents[idx].status='approved'; wrStudents[idx].hostelInfo=hostelInfo; wrStudents[idx].renewalSemester=''; wrStudents[idx].semesterNo=String(renewalSem); }
     wrCloseApprove();
     renderWardenStats();
     renderApplicationsList();
@@ -6639,15 +6761,21 @@ async function recalcDues() {
   const regPaid     = payments.some(p => p.paymentType === 'registrationFee' && p.status === 'approved');
   const cautionPaid = payments.some(p => p.paymentType === 'cautionMoney'    && p.status === 'approved');
 
-  const totalPaid  = (regPaid ? regFee : 0) + (cautionPaid ? cautionMoney : 0) + (approvedPayments.length * allotPerSem);
+  // Count unique sessions with an approved semesterFee payment (not array length, which
+  // could be >1 if a receipt was resubmitted and both entries somehow show approved)
+  const approvedSessionsPaid = new Set(
+    approvedPayments.map(p => String(p.semester).trim())
+  );
+  const totalPaid  = (regPaid ? regFee : 0) + (cautionPaid ? cautionMoney : 0) + (approvedSessionsPaid.size * allotPerSem);
   const feeBalance = Math.max(0, totalRequired - totalPaid);
 
   // ── Only count fines that are relevant to sessions up to selSem ─────────────
   const totalFine = fines.reduce((a,f) => {
     if(f.revoked || f.paid) return a;
     // Exclude system-generated late fines for sessions AFTER the selected session
-    if(f.isSystemGenerated && f.fineCategory === 'semester' && f.sessionSemester) {
-      if(!sessionsUpToSel.includes(String(f.sessionSemester).trim())) return a;
+    // Field stored by backend is lateFineForSemester (not sessionSemester — that field doesn't exist)
+    if(f.isSystemGenerated && f.fineCategory === 'semester' && f.lateFineForSemester) {
+      if(!sessionsUpToSel.includes(String(f.lateFineForSemester).trim())) return a;
     }
     return a + Number(f.amount||0);
   }, 0);
@@ -7034,15 +7162,17 @@ function renderStudentDocLinks(s) {
   if(!div) return;
   const dl = getDriveLinks(s);
   const items = [];
-  if(dl.allotmentLetter) items.push({label:'📄 Allotment Letter', url:dl.allotmentLetter});
-  if(dl.noDuesCert)      items.push({label:'📄 No Dues Certificate', url:dl.noDuesCert});
+  if(dl.provisionalLetter) items.push({label:'📋 Provisional Allotment Letter', url:dl.provisionalLetter, style:''});
+  if(dl.allotmentLetter)   items.push({label:'📄 Allotment Letter', url:dl.allotmentLetter, style:''});
+  if(dl.noDuesCert)        items.push({label:'📄 No Dues Certificate', url:dl.noDuesCert, style:''});
+  if(dl.hdnLetterLatest)   items.push({label:'📋 Fee Demand Notice (HDN)', url:dl.hdnLetterLatest, style:'background:#eff6ff;color:#1e40af;border-color:#bfdbfe'});
   // Leave letters from leaves are loaded separately
   if(!items.length) { div.innerHTML=''; return; }
   div.innerHTML = `
     <div style="border-top:1px solid var(--gray-100);margin-top:14px;padding-top:14px">
       <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-600);margin-bottom:8px">Your Documents</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${items.map(it=>`<a href="${it.url}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px">${it.label}</a>`).join('')}
+        ${items.map(it=>`<a href="${it.url}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;${it.style}">${it.label}</a>`).join('')}
       </div>
     </div>`;
 }
@@ -10079,9 +10209,14 @@ async function doUndebarStudent(rollFull, debarId, studentName) {
     // Check if any active debars remain for this student (cache was just refreshed)
     const stuEntry = debarRecordsCache.find(s => s.rollFull === rollFull);
     const stillDebarred = stuEntry && (stuEntry.debarRecords||[]).some(d => d.active);
-    const msg = stillDebarred
+    let msg = stillDebarred
       ? 'Debarment record lifted. Student still has other active debar records.'
       : 'Debarment lifted. Student status restored to Approved.';
+    if(!stillDebarred && r.hdnIssued) {
+      msg += ' Hostel Fee Demand Notice (HDN) issued for current session.';
+    } else if(!stillDebarred && r.hdnIssued === false) {
+      msg += ' No outstanding fee due for current session — HDN not required.';
+    }
     toast(msg, 'success');
   } else {
     toast(r.error || 'Failed to lift debarment.', 'error');
