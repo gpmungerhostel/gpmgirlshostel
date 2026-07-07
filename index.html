@@ -532,12 +532,12 @@
          </span>
       </p>
       <div class="ref-box" id="ns-ref-display"></div>
-      <div style="margin-top:14px;padding:12px 16px;background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:var(--radius-md);font-size:13px;text-align:left">
+      <div id="ns-success-download-hint" style="margin-top:14px;padding:12px 16px;background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:var(--radius-md);font-size:13px;text-align:left">
         <strong>📥 To download your letter later:</strong><br/>
         Go to <em>Home → Download Provisional Letter</em> and enter your registered Email + Access Key.
       </div>
       <br/>
-      <button class="btn btn-primary" onclick="showSection('home')">← Back to Home</button>
+      <button class="btn btn-primary" id="ns-success-back-btn" onclick="nsSuccessBack()">← Back to Home</button>
     </div>
   </div>
 </section>
@@ -548,6 +548,11 @@
 <section id="sec-download-letter" class="hidden">
   <div class="card" style="max-width:480px;margin:0 auto">
     <button class="back-link" onclick="showSection('home')">← Back to Home</button>
+
+    <!-- VISIBLE BACKEND VERSION BANNER — shows whether the backend is updated -->
+    <div id="dl-backend-version-banner" style="margin-bottom:12px;padding:8px 12px;border-radius:6px;font-size:11px;text-align:center;background:#f0f0f0;color:#666">
+      <span class="spinner" style="width:10px;height:10px;margin-right:4px"></span> Checking backend version...
+    </div>
 
     <div style="text-align:center;margin-bottom:20px">
       <div style="font-size:40px;margin-bottom:6px">📥</div>
@@ -576,11 +581,13 @@
         <div class="err-msg hidden" id="err-dl-access-key"></div>
       </div>
       <div class="err-msg hidden" id="err-dl-verify" style="margin-bottom:12px"></div>
+      <!-- Debug alert — shown when the backend returns diagnostic info -->
+      <div id="dl-debug-alert" class="alert alert-warning hidden" style="margin-bottom:12px;font-size:11px;line-height:1.5"></div>
       <button class="btn btn-primary" style="width:100%" onclick="verifyAndDownload()" id="dl-verify-btn">
         🔍 Verify &amp; Get Letter
       </button>
       <div style="margin-top:14px;padding:10px 12px;background:var(--gray-50);border-radius:var(--radius-md);font-size:12px;color:var(--gray-600)">
-        <strong>Forgot your Access Key?</strong> Contact the Hostel Office with your original admission documents for assistance.
+        <strong>Application rejected?</strong> Enter your registered Email + Access Key above to see the rejection reason and edit your application.
       </div>
     </div>
 
@@ -2452,6 +2459,64 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // Warden credentials are stored securely in the Google Sheet "Config" tab.
 // Do NOT put warden ID/password in this file — it is public on GitHub.
 
+// ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
+// On page load, fetch the backend version and:
+// 1. Log it to the console (F12 → Console)
+// 2. Display it in a visible banner on the Download Provisional Letter page
+// If the version doesn't say "v20.4", the new code hasn't been deployed yet.
+const EXPECTED_BACKEND_VERSION = 'v20.5';
+let _backendVersion = null;
+let _backendVersionChecked = false;
+
+async function checkBackendVersion() {
+  if(_backendVersionChecked) return _backendVersion;
+  _backendVersionChecked = true;
+  try {
+    const res = await fetch(GAS_URL);
+    const data = await res.json();
+    _backendVersion = data.version || 'UNKNOWN';
+    console.log('%c[Backend Version] ' + _backendVersion,
+      'color:#1a3a7c;font-weight:bold;font-size:14px');
+    console.log('[Backend Version] Full response:', data);
+
+    // Update the visible banner on the download page
+    const banner = document.getElementById('dl-backend-version-banner');
+    if(banner) {
+      if(_backendVersion === EXPECTED_BACKEND_VERSION) {
+        banner.style.background = '#e8f5e9';
+        banner.style.color = '#1b5e20';
+        banner.innerHTML = '✅ Backend updated (' + _backendVersion + ') — rejected applications can be edited.';
+      } else {
+        banner.style.background = '#fde8e8';
+        banner.style.color = '#c62828';
+        banner.innerHTML = '⚠️ <strong>BACKEND NOT UPDATED!</strong> Current: ' + _backendVersion +
+          ' (expected ' + EXPECTED_BACKEND_VERSION + '). Rejected applications will show "Incorrect Access Key" until you deploy the new Apps Script code. ' +
+          'See DEPLOYMENT_CHECKLIST.md for instructions.';
+      }
+    }
+
+    if(_backendVersion !== EXPECTED_BACKEND_VERSION) {
+      console.error('%c⚠ BACKEND NOT UPDATED! Expected ' + EXPECTED_BACKEND_VERSION + ' but got ' + _backendVersion +
+        '. Please deploy a new version in Google Apps Script.',
+        'color:red;font-weight:bold;font-size:14px');
+    }
+    return _backendVersion;
+  } catch(e) {
+    console.error('[Backend Version] Could not fetch version:', e.message);
+    _backendVersion = 'ERROR';
+    const banner = document.getElementById('dl-backend-version-banner');
+    if(banner) {
+      banner.style.background = '#fff3cd';
+      banner.style.color = '#856404';
+      banner.innerHTML = '⚠️ Could not check backend version: ' + e.message;
+    }
+    return _backendVersion;
+  }
+}
+
+// Run the check on page load
+checkBackendVersion();
+
 const BIHAR_DISTRICTS = [
   "Araria","Arwal","Aurangabad","Banka","Begusarai","Bhagalpur","Bhojpur","Buxar",
   "Darbhanga","East Champaran","Gaya","Gopalganj","Jamui","Jehanabad","Kaimur",
@@ -2520,6 +2585,9 @@ function _renderSection(name) {
   // ── Per-section refresh logic ──────────────────────────
   if(name === 'download-letter') {
     dlReset();
+    // Re-check the backend version whenever the user visits this page
+    _backendVersionChecked = false;
+    checkBackendVersion();
   }
 
   if(name === 'warden') {
@@ -2602,25 +2670,54 @@ function fmtDMY(raw) {
 // TOAST
 // ══════════════════════════════════════════════════════════
 // ── GLOBAL DATE FORMATTER ──
-// Formats a DOB value (ISO timestamp or YYYY-MM-DD) to "12th May 2008" style.
-// Handles ISO timestamps like "2008-10-04T18:30:00.000Z" correctly by parsing
-// the date components directly to avoid timezone-shift bugs.
+// Formats a DOB value (ISO timestamp, YYYY-MM-DD, or Date) to "12th May 2008" style.
+// BUG FIX (DOB one-day-behind): when the backend sends a Date object it gets
+// JSON-serialised to an ISO UTC string like "2008-01-07T18:30:00.000Z". Parsing
+// the YYYY-MM-DD prefix directly would yield "7th January 2008" — one day behind.
+// We now detect ISO timestamps with a time component and convert them to the
+// user's local date before formatting.
 function formatDOB(v) {
   if(!v) return '—';
+  // Date object — convert to local YYYY-MM-DD
+  if(v instanceof Date && !isNaN(v.getTime())) {
+    return _formatDOBFromParts(v.getFullYear(), v.getMonth()+1, v.getDate());
+  }
   const s = String(v).trim();
-  // Extract YYYY-MM-DD from ISO string or plain date
-  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(!match) return s;
-  const year = parseInt(match[1],10);
-  const month = parseInt(match[2],10) - 1; // 0-based
-  const day   = parseInt(match[3],10);
+  // YYYY-MM-DD (plain date — preferred backend format) — parse directly,
+  // NEVER via new Date() because ISO date strings are interpreted as UTC.
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) {
+    return _formatDOBFromParts(parseInt(m[1],10), parseInt(m[2],10), parseInt(m[3],10));
+  }
+  // ISO timestamp with time component (e.g. "2008-01-07T18:30:00.000Z") —
+  // this happens when the backend returns a Date object. Convert to local date
+  // using new Date() (which parses ISO strings as UTC) and extract local parts.
+  const mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if(mIso) {
+    const d = new Date(s);
+    if(!isNaN(d.getTime())) {
+      return _formatDOBFromParts(d.getFullYear(), d.getMonth()+1, d.getDate());
+    }
+    // Fallback to the raw YYYY-MM-DD if Date parsing fails
+    return _formatDOBFromParts(parseInt(mIso[1],10), parseInt(mIso[2],10), parseInt(mIso[3],10));
+  }
+  // DD-MM-YYYY
+  const m2 = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if(m2) {
+    return _formatDOBFromParts(parseInt(m2[3],10), parseInt(m2[2],10), parseInt(m2[1],10));
+  }
+  // Unknown format — return as-is
+  return s;
+}
+
+function _formatDOBFromParts(year, month1Based, day) {
   const months = ['January','February','March','April','May','June',
                   'July','August','September','October','November','December'];
   const suffix = (d) => {
     if(d>=11&&d<=13) return 'th';
     switch(d%10){case 1:return 'st';case 2:return 'nd';case 3:return 'rd';default:return 'th';}
   };
-  return day + suffix(day) + ' ' + months[month] + ' ' + year;
+  return day + suffix(day) + ' ' + months[month1Based-1] + ' ' + year;
 }
 
 function toast(msg, type='') {
@@ -2980,12 +3077,326 @@ async function nsSubmit() {
 
   if(r.success) {
     document.getElementById('ns-ref-display').textContent = 'Roll No: ' + rollFull;
+    // Reset the success screen content in case it was customized by a previous
+    // rejected-application re-submission flow.
+    const successHeading = document.querySelector('#ns-success h2');
+    const successPara    = document.querySelector('#ns-success p');
+    const downloadHint   = document.getElementById('ns-success-download-hint');
+    if(successHeading) successHeading.textContent = 'Application Submitted!';
+    if(successPara) successPara.innerHTML = 'Your application has been sent to the Warden for provisional approval.<br/>'+
+      'Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>'+
+      '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
+      'Your registered Email + your Access Key</span>';
+    if(downloadHint) downloadHint.style.display = '';
     for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
     document.getElementById('ns-success').classList.remove('hidden');
     window.scrollTo({top:0,behavior:'smooth'});
   } else {
     showErr('ns-submit', r.error || 'Submission failed. Please try again.');
     document.getElementById('err-ns-submit').classList.remove('hidden');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// EDIT REJECTED ADMISSION APPLICATION
+// ══════════════════════════════════════════════════════════
+// BUG FIX: previously a rejected student had no way to edit the original
+// admission form fields. This function reuses the existing new-admission form
+// (sec-new-student), pre-fills every field with the student's current data,
+// relaxes the photo/signature requirements (they are already on file), and
+// re-routes the final submit to the backend's updateRejectedAdmission().
+let _editingRejectedAdmission = false;
+let _editingRejectedRollFull  = null;
+let _editingFromPublicPage    = false;  // true when editing from the download page (not logged in)
+
+function editRejectedAdmission() {
+  if(!csStudent) { toast('No student record loaded.', 'error'); return; }
+  if(csStudent.status !== 'rejected') {
+    toast('Only rejected applications can be edited.', 'error');
+    return;
+  }
+
+  // Set the edit-mode flags so nsValidate / nsSubmit know to behave accordingly
+  _editingRejectedAdmission = true;
+  _editingRejectedRollFull  = csStudent.rollFull;
+
+  // Determine if we're editing from the public download page (not logged in)
+  // or from the logged-in student portal. This affects where the student is
+  // redirected after a successful re-submission.
+  // If the student is on the download-letter page, they're not logged in
+  // (rejected students can't register). Otherwise, they're logged in.
+  _editingFromPublicPage = (currentSection === 'download-letter');
+
+  // Reset upload state so we don't accidentally reuse a previous session's files
+  delete uploadedB64['photo'];
+  delete uploadedB64['sig'];
+  delete uploadedFiles['photo'];
+  delete uploadedFiles['sig'];
+
+  // Reset the file-zone UI
+  const photoZone = document.getElementById('zone-photo');
+  const sigZone   = document.getElementById('zone-sig');
+  if(photoZone) photoZone.innerHTML =
+    '<div class="file-icon" id="icon-photo">📷</div><div class="file-info"><p id="fname-photo">Current photo on file (click to replace)</p><small id="fsize-photo">50 KB – 200 KB</small></div>';
+  if(sigZone) sigZone.innerHTML =
+    '<div class="file-icon" id="icon-sig">✍️</div><div class="file-info"><p id="fname-sig">Current signature on file (click to replace)</p><small id="fsize-sig">20 KB – 100 KB</small></div>';
+
+  // Clear any previous errors
+  ['ns-name','ns-guardian','ns-roll','ns-dob','photo','ns-contact','ns-gcontact','ns-email','ns-pin','ns-semester','sig','ns-access-key','ns-access-key-confirm','ns-submit'].forEach(id => {
+    const el = document.getElementById('err-'+id);
+    if(el) el.classList.add('hidden');
+  });
+
+  // ── Pre-fill Step 0: Personal Info ──────────────────────────────────────
+  document.getElementById('ns-name').value     = csStudent.name || '';
+  document.getElementById('ns-guardian').value = csStudent.guardianName || '';
+
+  // Split rollFull "25/CSE/2026" back into the three input fields
+  const rollParts = String(csStudent.rollFull || '').split('/');
+  if(rollParts.length === 3) {
+    document.getElementById('ns-roll-no').value     = rollParts[0] || '';
+    document.getElementById('ns-roll-branch').value = rollParts[1] || 'CSE';
+    document.getElementById('ns-roll-year').value   = rollParts[2] || '';
+  } else {
+    document.getElementById('ns-roll-no').value     = '';
+    document.getElementById('ns-roll-branch').value = 'CSE';
+    document.getElementById('ns-roll-year').value   = '';
+  }
+  updateRollPreview();
+
+  // DOB: backend now always returns YYYY-MM-DD (post Bug #2 fix). For older
+  // records that may still arrive as ISO timestamps, extract the date part.
+  let dobVal = csStudent.dob || '';
+  if(dobVal) {
+    const m = String(dobVal).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) dobVal = m[1]+'-'+m[2]+'-'+m[3];
+    else dobVal = '';
+  }
+  document.getElementById('ns-dob').value = dobVal;
+
+  // ── Pre-fill Step 1: Contact & Address ──────────────────────────────────
+  document.getElementById('ns-contact').value  = csStudent.contactNo || '';
+  document.getElementById('ns-gcontact').value = csStudent.guardianContact || '';
+  document.getElementById('ns-email').value    = csStudent.email || '';
+  document.getElementById('ns-pin').value      = csStudent.pin || '';
+  document.getElementById('ns-address').value  = csStudent.address || '';
+
+  // District dropdown — populated on DOMContentLoaded from BIHAR_DISTRICTS.
+  // If the student's district is in the list, select it; otherwise leave blank.
+  const districtEl = document.getElementById('ns-district');
+  if(districtEl) {
+    const targetDistrict = csStudent.district || '';
+    const opts = Array.from(districtEl.options);
+    const matchOpt = opts.find(o => o.value === targetDistrict || o.text === targetDistrict);
+    if(matchOpt) districtEl.value = matchOpt.value;
+    else districtEl.value = '';
+  }
+
+  // Admission session — parse "Odd 2026" / "Even 2025" back into the two inputs
+  const admSess = csStudent.admissionSession || csStudent.semesterNo || '';
+  const sessParts = admSess.trim().match(/^(Odd|Even)\s+(\d{4})$/i);
+  if(sessParts) {
+    const semTypeEl = document.getElementById('ns-sem-type');
+    const semYearEl = document.getElementById('ns-sem-year');
+    if(semTypeEl) semTypeEl.value = sessParts[1].charAt(0).toUpperCase() + sessParts[1].slice(1).toLowerCase();
+    if(semYearEl) semYearEl.value = sessParts[2];
+  } else {
+    document.getElementById('ns-sem-type').value = 'Odd';
+    document.getElementById('ns-sem-year').value = '';
+  }
+  composeAdmissionSession();
+
+  // ── Pre-fill Step 2: Signature + Access Key ─────────────────────────────
+  // Access Key: leave blank — the backend will keep the existing key if not provided.
+  // Show a hint that the key is optional in edit mode.
+  document.getElementById('ns-access-key').value = '';
+  document.getElementById('ns-access-key-confirm').value = '';
+
+  // Toggle the access-key section to make it optional in edit mode
+  const akHintEl = document.querySelector('#ns-step-2 .hint');
+  if(akHintEl) {
+    akHintEl.textContent = 'Leave blank to keep your existing Access Key. Or enter a new one (4–32 chars) to change it.';
+  }
+
+  // Change the submit button label and the step-2 info banner
+  const submitBtn = document.getElementById('ns-submit-btn');
+  if(submitBtn) submitBtn.textContent = 'Update Application & Re-submit';
+
+  const step2Banner = document.querySelector('#ns-step-2 .alert-info');
+  if(step2Banner) {
+    step2Banner.innerHTML = '<strong>📋 Editing rejected application</strong><br/>'+
+      'Correct the issue(s) mentioned in the rejection reason and click <strong>Update Application &amp; Re-submit</strong>. '+
+      'Your application will be sent back to the Warden for review. Photo and signature are optional — if you do not upload new ones, your existing ones will be kept.';
+  }
+
+  // Hide the success screen (in case it was visible from a previous submission)
+  document.getElementById('ns-success').classList.add('hidden');
+
+  // Show the new-student section starting at step 0
+  showSection('new-student');
+  nsGo(0);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// Hook into nsValidate: in edit mode, photo and signature are optional
+// (the student already has them on file from the original submission).
+const _originalNsValidate = nsValidate;
+nsValidate = function(step) {
+  if(_editingRejectedAdmission) {
+    // Temporarily bypass the photo/signature checks in edit mode.
+    // We do this by stashing any existing uploadedB64 values, calling the
+    // original validator, then restoring.
+    const hadPhoto = !!uploadedB64['photo'];
+    const hadSig   = !!uploadedB64['sig'];
+    if(!hadPhoto) uploadedB64['photo'] = '__EDIT_MODE_PLACEHOLDER__';
+    if(!hadSig)   uploadedB64['sig']   = '__EDIT_MODE_PLACEHOLDER__';
+    const result = _originalNsValidate(step);
+    // Restore: only clear the placeholders, never real uploads
+    if(!hadPhoto) delete uploadedB64['photo'];
+    if(!hadSig)   delete uploadedB64['sig'];
+    // In edit mode, access key is optional — clear any "required" error
+    if(step === 2) {
+      const akErr = document.getElementById('err-ns-access-key');
+      const akVal = document.getElementById('ns-access-key')?.value || '';
+      // If access key is blank, that's fine in edit mode (keep existing)
+      if(akVal === '') {
+        clearErr('ns-access-key');
+        clearErr('ns-access-key-confirm');
+      } else {
+        // If a new key is entered, it must meet length + match requirements
+        if(akVal.length < 4) { showErr('ns-access-key','New Access Key must be at least 4 characters'); }
+        else if(akVal.length > 32) { showErr('ns-access-key','New Access Key must be at most 32 characters'); }
+        else {
+          clearErr('ns-access-key');
+          const akc = document.getElementById('ns-access-key-confirm')?.value || '';
+          if(akVal !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); }
+          else clearErr('ns-access-key-confirm');
+        }
+      }
+      // Recompute ok based on current error visibility
+      const errEls = ['err-ns-access-key','err-ns-access-key-confirm','err-sig'].map(id => document.getElementById(id));
+      const hasErr = errEls.some(el => el && !el.classList.contains('hidden'));
+      return !hasErr;
+    }
+    return result;
+  }
+  return _originalNsValidate(step);
+};
+
+// Hook into nsSubmit: in edit mode, route to updateRejectedAdmission instead of newStudent
+const _originalNsSubmit = nsSubmit;
+nsSubmit = async function() {
+  if(!_editingRejectedAdmission) {
+    return _originalNsSubmit();
+  }
+  // ── Edit mode: validate and call updateRejectedAdmission ──────────────
+  if(!nsValidate(2)) return;
+  const _semCheck = (document.getElementById('ns-semester')?.value || '').trim();
+  if(!_semCheck) {
+    nsGo(1);
+    showErr('ns-semester','Please select your admission session');
+    return;
+  }
+  const btn = document.getElementById('ns-submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Updating…';
+  clearErr('ns-submit');
+
+  const payload = {
+    rollFull: _editingRejectedRollFull,
+    name: getVal('ns-name'),
+    guardianName: getVal('ns-guardian'),
+    dob: getVal('ns-dob'),
+    contactNo: getVal('ns-contact'),
+    guardianContact: getVal('ns-gcontact'),
+    email: getVal('ns-email').toLowerCase(),
+    district: document.getElementById('ns-district')?.value,
+    pin: getVal('ns-pin'),
+    address: getVal('ns-address'),
+    admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
+    accessKey: document.getElementById('ns-access-key')?.value || '',
+    photo: uploadedB64['photo'] || '',
+    signature: uploadedB64['sig'] || ''
+  };
+
+  const r = await callBackend('updateRejectedAdmission', payload);
+  btn.disabled = false;
+  btn.innerHTML = 'Update Application & Re-submit';
+
+  if(r.success) {
+    // Reset edit-mode flags
+    _editingRejectedAdmission = false;
+    _editingRejectedRollFull  = null;
+    // Show a custom success message
+    document.getElementById('ns-ref-display').textContent = 'Roll No: ' + payload.rollFull;
+    const successScreen = document.getElementById('ns-success');
+    // Customize the success screen text for re-submission
+    const successHeading = successScreen.querySelector('h2');
+    const successPara    = successScreen.querySelector('p');
+    if(successHeading) successHeading.textContent = 'Application Re-submitted!';
+    if(successPara) successPara.innerHTML = 'Your corrected application has been sent to the Warden for review.<br/>'+
+      'Once approved, you will be able to download your <strong>Provisional Allotment Letter</strong>.<br/>'+
+      '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
+      'Status: <strong>Application Submitted</strong></span>';
+    // Hide the "download letter later" hint — not relevant for a re-submission
+    const downloadHint = document.getElementById('ns-success-download-hint');
+    if(downloadHint) downloadHint.style.display = 'none';
+    for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
+    successScreen.classList.remove('hidden');
+    window.scrollTo({top:0,behavior:'smooth'});
+
+    // Refresh csStudent so the rejection notice disappears and status updates
+    try {
+      const rd = await callBackend('getStudent', {rollFull: payload.rollFull});
+      if(rd && rd.success && rd.student) {
+        csStudent = rd.student;
+        // The "Back to Home" button (nsSuccessBack) will redirect to the profile
+      }
+    } catch(_) { /* silent */ }
+  } else {
+    showErr('ns-submit', r.error || 'Update failed. Please try again.');
+    document.getElementById('err-ns-submit').classList.remove('hidden');
+  }
+};
+
+// Helper to return to the student profile after a successful re-submission
+// (replaces the "Back to Home" button when in edit mode)
+function returnToStudentProfile() {
+  _editingRejectedAdmission = false;
+  _editingRejectedRollFull  = null;
+  // Reset the form for next time
+  const submitBtn = document.getElementById('ns-submit-btn');
+  if(submitBtn) submitBtn.textContent = 'Submit Application';
+
+  // If editing from the public download page (not logged in), go to Home.
+  // The student can't view their profile because they don't have a portal account.
+  if(_editingFromPublicPage) {
+    _editingFromPublicPage = false;
+    csStudent = null;  // clear the temporary csStudent set from the download page
+    showSection('home');
+    return;
+  }
+
+  if(csStudent) {
+    showSection('continuing');
+    // Trigger a fresh profile render so the new "Application Submitted" status shows
+    setTimeout(() => {
+      if(typeof renderStudentProfile === 'function') renderStudentProfile();
+    }, 100);
+  } else {
+    showSection('home');
+  }
+}
+
+// Handler for the "Back to Home" button on the new-student success screen.
+// After a rejected-application re-submission, returns the student to their
+// profile (if logged in) or Home (if editing from the public download page).
+function nsSuccessBack() {
+  // If we just re-submitted a rejected application, go back to the profile
+  if(csStudent && csStudent.rollFull) {
+    returnToStudentProfile();
+  } else {
+    showSection('home');
   }
 }
 
@@ -3181,13 +3592,26 @@ function renderStudentProfile() {
   if(s.status === 'rejected') {
     const dl = getDriveLinks(s);
     const rejections = dl.rejections || [];
-    const latest = rejections.length ? rejections[rejections.length-1] : null;
+    // Find the latest rejection that is NOT a "[RESUBMITTED]" system note —
+    // that is the actual warden rejection reason the student needs to see.
+    const latestWardenRejection = [...rejections].reverse().find(r => !r.resubmission) || null;
+    const latest = latestWardenRejection || (rejections.length ? rejections[rejections.length-1] : null);
     const notice = document.createElement('div');
     notice.id = 'cs-rejection-notice';
-    notice.innerHTML = `<div class="alert alert-danger" style="margin-top:12px">
+    notice.innerHTML = `<div class="alert alert-danger" style="margin-top:12px;border-left:4px solid var(--danger)">
       <strong>⚠ Application Rejected</strong>
-      ${latest ? `<div style="margin-top:6px"><strong>Reason:</strong> ${latest.reason}</div><div style="font-size:11px;margin-top:3px">Rejected on: ${new Date(latest.date).toLocaleDateString('en-IN')}</div>` : ''}
-      <div style="margin-top:8px;font-size:12px">Please correct the issue(s) and re-submit through the <strong>Update</strong> tab. Once you update your details, the warden will review again.</div>
+      ${latest ? `<div style="margin-top:8px;padding:10px 12px;background:rgba(255,255,255,.6);border:1px solid #f5c6c6;border-radius:6px">
+        <div style="font-size:12px;color:var(--gray-600);margin-bottom:3px"><strong>Reason for rejection:</strong></div>
+        <div style="font-size:13px;color:var(--danger);font-weight:600;line-height:1.5">${latest.reason}</div>
+        <div style="font-size:11px;margin-top:6px;color:var(--gray-600)">Rejected on: ${latest.date ? new Date(latest.date).toLocaleDateString('en-IN') : '—'}</div>
+      </div>` : '<div style="margin-top:6px;font-size:12px">No specific reason was provided. Please contact the Hostel Office.</div>'}
+      <div style="margin-top:12px;font-size:12.5px;color:var(--gray-700);line-height:1.55">
+        You can <strong>edit your application</strong> to correct the issue(s) mentioned above and re-submit it for the Warden's review.
+        Once re-submitted, your application status will change back to <strong>"Application Submitted"</strong> and the Warden will review it again.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn btn-primary btn-sm" onclick="editRejectedAdmission()" style="font-size:12px">✏️ Edit Application &amp; Re-submit</button>
+      </div>
     </div>`;
     document.getElementById('cs-allot').after(notice);
   }
@@ -4832,7 +5256,12 @@ function renderApplicationsList() {
 
   const makeRejectedRow = s => {
     const lastRejection = (() => {
-      try { const dl=getDriveLinks(s); const rj=dl.rejections; return rj&&rj.length?rj[rj.length-1]:null; } catch(_){return null;}
+      try {
+        const dl=getDriveLinks(s); const rj=dl.rejections;
+        if(!rj || !rj.length) return null;
+        // Skip "[RESUBMITTED]" system notes — show the latest warden rejection
+        return [...rj].reverse().find(r => !r.resubmission) || rj[rj.length-1];
+      } catch(_){return null;}
     })();
     return `<div class="student-row" style="align-items:flex-start">
       <div style="display:flex;gap:12px;align-items:flex-start;flex:1">
@@ -7754,10 +8183,11 @@ async function loadWardenLeaves() {
 
   const makeLeaveRow=(l,showActions)=>{ 
     const statusClass=l.status==='approved'?'badge-approved':l.status==='rejected'?'badge-rejected':'badge-pending';
+    const btnId = 'lv-btn-' + l.leaveId.replace(/[^a-zA-Z0-9]/g, '_');
     const actions=showActions?`
       <div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn btn-success btn-sm" onclick="decideLeave('${l.leaveId}','approved')" style="font-size:11px">✓ Approve</button>
-        <button class="btn btn-danger btn-sm" onclick="promptRejectLeave('${l.leaveId}')" style="font-size:11px">✗ Reject</button>
+        <button class="btn btn-success btn-sm" id="${btnId}-approve" onclick="decideLeave('${l.leaveId}','approved',this)" style="font-size:11px">✓ Approve</button>
+        <button class="btn btn-danger btn-sm" id="${btnId}-reject" onclick="promptRejectLeave('${l.leaveId}',this)" style="font-size:11px">✗ Reject</button>
       </div>`:'';
     const dlBtn = l.status==='approved'
       ? (l.driveUrl
@@ -7794,13 +8224,53 @@ async function loadWardenLeaves() {
     :'<p style="color:var(--gray-400);font-size:13px">No decided leave applications yet.</p>';
 }
 
-async function decideLeave(leaveId, decision, reason) {
-  const r=await callBackend('decideLeave',{leaveId, decision, reason:reason||''});
-  if(r.success){
-    toast(decision==='approved'?'Leave approved! PDF generated.':'Leave rejected.', decision==='approved'?'success':'error');
-    await loadWardenLeaves();
-  } else {
-    toast('Failed: '+(r.error||''),'error');
+async function decideLeave(leaveId, decision, reason, btnEl) {
+  // BUG FIX (leave reject "not working"): added loading indicator on the
+  // clicked button so the warden gets visual feedback while the backend
+  // call is in flight. Also added comprehensive error handling with
+  // console logging so any failure is visible in the browser console.
+  // The button element is passed explicitly as `btnEl` (from `this` in the
+  // onclick handler) so we don't rely on the global `event` variable.
+  console.log('[decideLeave] called:', {leaveId, decision, reason: (reason||'').slice(0,80)});
+
+  let clickedBtn = btnEl || null;
+  // Fallback: try to find the button from the global event (older browsers)
+  if(!clickedBtn && typeof event !== 'undefined' && event && event.target) {
+    try { clickedBtn = event.target.closest('button'); } catch(_) {}
+  }
+  if(clickedBtn) {
+    clickedBtn.disabled = true;
+    const originalHtml = clickedBtn.innerHTML;
+    clickedBtn.innerHTML = '<span class="spinner spinner-dark"></span> ' + (decision==='approved' ? 'Approving…' : 'Rejecting…');
+    clickedBtn.dataset.originalHtml = originalHtml;
+  }
+
+  try {
+    const r = await callBackend('decideLeave', {leaveId, decision, reason: reason || ''});
+    console.log('[decideLeave] backend response:', r);
+
+    if(r.success) {
+      toast(decision==='approved'
+        ? 'Leave approved! PDF generated.'
+        : 'Leave rejected. The student will be notified.',
+        'success');
+      await loadWardenLeaves();
+    } else {
+      console.error('[decideLeave] backend returned error:', r.error);
+      toast('Failed: ' + (r.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    console.error('[decideLeave] exception:', e);
+    toast('Error: ' + (e.message || 'Unknown error'), 'error');
+  } finally {
+    // Re-enable the button
+    if(clickedBtn) {
+      clickedBtn.disabled = false;
+      if(clickedBtn.dataset.originalHtml) {
+        clickedBtn.innerHTML = clickedBtn.dataset.originalHtml;
+        delete clickedBtn.dataset.originalHtml;
+      }
+    }
   }
 }
 
@@ -7879,16 +8349,44 @@ async function runBulkApproveLeaves() {
   toast(msg, failed ? 'error' : 'success');
   await loadWardenLeaves();
 }
-function promptRejectLeave(leaveId) {
-  openReasonModal({
-    title: 'Reject Leave Application',
-    label: 'Rejection Reason',
-    placeholder: 'e.g. Incomplete details, clash with exam schedule...',
-    required: true,
-    confirmLabel: '✗ Reject Leave',
-    confirmClass: 'btn-danger',
-    onConfirm: (reason) => decideLeave(leaveId, 'rejected', reason)
-  });
+function promptRejectLeave(leaveId, btnEl) {
+  // BUG FIX (leave reject "not working"): The previous implementation used a
+  // custom modal (openReasonModal → reason-modal → submitReasonModal) which
+  // was failing to open for some wardens — clicking Reject did nothing visible.
+  // Root cause was difficult to reproduce (likely a DOM/CSS/JS-error interaction
+  // specific to the deployed environment), so we now use the browser's native
+  // window.prompt() dialog which CANNOT be broken by CSS, DOM, or JS issues.
+  // This guarantees the warden can always reject a leave.
+  console.log('[promptRejectLeave] called for leaveId:', leaveId);
+  if(!leaveId) {
+    console.error('[promptRejectLeave] no leaveId provided!');
+    toast('Error: could not identify the leave application.', 'error');
+    return;
+  }
+
+  // Use the native browser prompt — 100% reliable
+  const reason = window.prompt(
+    'Reject Leave Application\n\n' +
+    'Leave ID: ' + leaveId + '\n\n' +
+    'Enter the reason for rejection (the student will see this):',
+    ''
+  );
+
+  // User clicked Cancel or closed the dialog
+  if(reason === null) {
+    console.log('[promptRejectLeave] user cancelled the rejection');
+    return;
+  }
+
+  const trimmedReason = reason.trim();
+  if(!trimmedReason) {
+    toast('Rejection reason is required. Please try again and enter a reason.', 'error');
+    return;
+  }
+
+  // Call decideLeave with the rejection reason and the button element
+  console.log('[promptRejectLeave] proceeding with reason:', trimmedReason.slice(0, 80));
+  decideLeave(leaveId, 'rejected', trimmedReason, btnEl);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -9445,6 +9943,16 @@ function closeReasonModal() {
   modal.classList.add('hidden');
   modal.style.display = 'none';
   _reasonModalCallback = null;
+  // BUG FIX: reset the Confirm/Cancel buttons so they are not stuck disabled
+  // if the modal is reopened after a previous submit.
+  const confirmBtn = document.getElementById('reason-modal-confirm');
+  const cancelBtn  = document.getElementById('reason-modal-cancel');
+  if(confirmBtn) {
+    confirmBtn.disabled = false;
+    if(confirmBtn.dataset.originalHtml) confirmBtn.innerHTML = confirmBtn.dataset.originalHtml;
+    delete confirmBtn.dataset.originalHtml;
+  }
+  if(cancelBtn) cancelBtn.disabled = false;
 }
 
 async function submitReasonModal() {
@@ -9457,8 +9965,29 @@ async function submitReasonModal() {
   }
   document.getElementById('reason-modal-err').classList.add('hidden');
   const cb = _reasonModalCallback;
-  closeReasonModal();
-  if(cb) await cb(text);
+  // BUG FIX (leave reject button "not working"): show a loading spinner on the
+  // Confirm button and disable it while the backend call is in flight. Previously
+  // the modal closed instantly and there was no visual feedback, so wardens would
+  // click Reject again, hit the "Leave already decided" error, and conclude the
+  // button was broken.
+  const confirmBtn = document.getElementById('reason-modal-confirm');
+  const cancelBtn  = document.getElementById('reason-modal-cancel');
+  if(confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.dataset.originalHtml = confirmBtn.innerHTML;
+    confirmBtn.innerHTML = '<span class="spinner"></span> Processing…';
+  }
+  if(cancelBtn) cancelBtn.disabled = true;
+  try {
+    if(cb) await cb(text);
+    closeReasonModal();
+  } catch(e) {
+    // Re-enable buttons so the user can retry after an error
+    if(confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = confirmBtn.dataset.originalHtml || 'Confirm'; }
+    if(cancelBtn)  cancelBtn.disabled = false;
+    console.error('submitReasonModal error:', e);
+    toast('Action failed: '+(e.message||'Unknown error'), 'error');
+  }
 }
 
 // Close on Escape key
@@ -9483,6 +10012,8 @@ function dlReset() {
   clearErr('dl-email');
   clearErr('dl-access-key');
   clearErr('dl-verify');
+  const debugAlert = document.getElementById('dl-debug-alert');
+  if(debugAlert) debugAlert.classList.add('hidden');
   const verify = document.getElementById('dl-step-verify');
   const result = document.getElementById('dl-step-result');
   if(verify) verify.classList.remove('hidden');
@@ -9491,6 +10022,10 @@ function dlReset() {
 
 async function verifyAndDownload() {
   clearErr('dl-email'); clearErr('dl-access-key'); clearErr('dl-verify');
+  // Clear the debug alert
+  const debugAlert = document.getElementById('dl-debug-alert');
+  if(debugAlert) debugAlert.classList.add('hidden');
+
   const email = (document.getElementById('dl-email')?.value || '').trim().toLowerCase();
   const key   = (document.getElementById('dl-access-key')?.value || '').trim();
   let ok = true;
@@ -9505,6 +10040,10 @@ async function verifyAndDownload() {
 
   const r = await callBackend('getProvisionalLetter', { email: email, accessKey: key });
 
+  // DEBUG: log the full backend response to the console so we can see exactly
+  // what the backend returned. Open F12 → Console to view.
+  console.log('%c[verifyAndDownload] Backend response:', 'color:#1a3a7c;font-weight:bold', r);
+
   btn.disabled = false;
   btn.innerHTML = '🔍 Verify &amp; Get Letter';
 
@@ -9512,8 +10051,55 @@ async function verifyAndDownload() {
 
   if(!r.success) {
     // Show error inline — keep form visible so user can retry
+    console.log('[verifyAndDownload] Error:', r.error);
     showErr('dl-verify', r.error || 'Verification failed. Please check and try again.');
     document.getElementById('err-dl-verify').classList.remove('hidden');
+    return;
+  }
+
+  // ─── REJECTED APPLICATION: show rejection reason + edit button ───────────
+  // BUG FIX: Previously, rejected applications got a generic error message.
+  // Now the backend returns the full rejection reason + student data, so the
+  // student can edit and re-submit directly from this public page (no login
+  // required — rejected students cannot register on the Student Portal).
+  console.log('[verifyAndDownload] Status:', r.status);
+  if(r.status === 'rejected') {
+    // Set csStudent so editRejectedAdmission() can pre-fill the form
+    csStudent = r.student;
+    console.log('[verifyAndDownload] Rejected application — showing edit form. csStudent set:', csStudent);
+    // _editingFromPublicPage is determined inside editRejectedAdmission()
+    // based on the current section (download-letter), so no need to set it here.
+
+    const rejectedAtStr = r.rejectedAt ? new Date(r.rejectedAt).toLocaleDateString('en-IN') : '—';
+    resultDiv.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:36px;margin-bottom:6px">⚠️</div>
+        <div style="font-size:15px;font-weight:700;color:var(--danger)">Application Rejected</div>
+      </div>
+      <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--gray-600);margin-bottom:2px">Student Name</div>
+        <div style="font-size:15px;font-weight:700;color:var(--navy)">${r.studentName}</div>
+        <div style="font-size:12px;color:var(--gray-600);margin-top:8px;margin-bottom:2px">Roll Number</div>
+        <div style="font-size:13px;font-weight:600">${r.rollFull}</div>
+      </div>
+      <div class="alert alert-danger" style="border-left:4px solid var(--danger);margin-bottom:16px">
+        <strong>Reason for rejection:</strong>
+        <div style="margin-top:8px;padding:10px 12px;background:rgba(255,255,255,.6);border:1px solid #f5c6c6;border-radius:6px;font-size:13px;color:var(--danger);font-weight:600;line-height:1.5">${r.rejectionReason}</div>
+        <div style="font-size:11px;margin-top:6px;color:var(--gray-600)">Rejected on: ${rejectedAtStr}</div>
+      </div>
+      <div style="padding:14px 16px;background:#eef3ff;border:1px solid #c5d3f0;border-radius:var(--radius-md);font-size:13px;color:var(--navy);line-height:1.6;margin-bottom:16px">
+        <strong>✏️ You can edit your application and re-submit it for the Warden's review.</strong><br/>
+        Click the button below to open the edit form with your current details pre-filled. Correct the issue(s) mentioned above and re-submit.
+      </div>
+      <button class="btn btn-primary" style="width:100%;font-size:14px;padding:13px;display:block;margin-bottom:12px" onclick="editRejectedAdmission()">
+        ✏️ Edit Application &amp; Re-submit
+      </button>
+      <button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="dlReset()">
+        ← Back to Email Entry
+      </button>`;
+    document.getElementById('dl-step-verify').classList.add('hidden');
+    document.getElementById('dl-step-result').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
 
@@ -10295,7 +10881,7 @@ function quickDebarFromPanel() {
       <div id="reason-modal-err" class="err-msg hidden" style="font-size:11px;color:var(--danger);margin-top:4px;font-weight:500"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn btn-secondary" style="flex:1" onclick="closeReasonModal()">Cancel</button>
+      <button id="reason-modal-cancel" class="btn btn-secondary" style="flex:1" onclick="closeReasonModal()">Cancel</button>
       <button id="reason-modal-confirm" class="btn btn-primary" style="flex:2" onclick="submitReasonModal()">Confirm</button>
     </div>
   </div>
