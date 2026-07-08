@@ -2464,7 +2464,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // 1. Log it to the console (F12 → Console)
 // 2. Display it in a visible banner on the Download Provisional Letter page
 // If the version doesn't say "v20.4", the new code hasn't been deployed yet.
-const EXPECTED_BACKEND_VERSION = 'v20.5';
+const EXPECTED_BACKEND_VERSION = 'v20.6';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -4094,10 +4094,56 @@ function renderOutstandingDues(s) {
     })());
   };
 
-  const isApprovedFor = (type, semNo) => payments.some(p =>
-    p.paymentType === type
-    && (semNo === undefined || String(p.semester) === String(semNo))
-    && p.status === 'approved');
+  // ── APPROVED-ONLY allocation helper ──────────────────────────────────────────
+  // BUG FIX (partial payment): Returns the total amount allocated to a fee type
+  // from APPROVED payments only (excludes pending). Used to determine if a fee
+  // is truly fully paid vs. only partially approved.
+  function getApprovedAllocatedFor(type, semNo) {
+    const approvedPays = payments.filter(p =>
+      p.paymentType !== 'semesterFee_due' &&
+      p.status === 'approved');
+
+    const byReceipt = {};
+    for(const p of approvedPays) {
+      const rk = p.receipt || ('__solo_' + approvedPays.indexOf(p));
+      if(!byReceipt[rk]) byReceipt[rk] = [];
+      byReceipt[rk].push(p);
+    }
+
+    let totalAlloc = 0;
+    for(const [rk, entries] of Object.entries(byReceipt)) {
+      const hasType = entries.some(e =>
+        e.paymentType === type &&
+        (semNo === undefined || String(e.semester) === String(semNo)));
+      if(!hasType) continue;
+
+      const totalOnReceipt = Number(entries[0].totalAmountOnReceipt || 0) ||
+                             entries.reduce((a, e) => a + Number(e.amount || 0), 0);
+
+      const feeTypes = entries.map(e => ({
+        type: e.paymentType,
+        sem:  String(e.semester || ''),
+        expectedAmount: Number(e.expectedAmount || FEE_REQUIRED[e.paymentType] || 4500)
+      }));
+
+      const allocMap = calcPriorityAlloc(totalOnReceipt, feeTypes);
+      const key = _feeKey(type, semNo !== undefined ? String(semNo) : undefined);
+      totalAlloc += allocMap[key] || 0;
+    }
+    return totalAlloc;
+  }
+
+  // BUG FIX (partial payment): A fee is "fully covered" only when the total
+  // APPROVED allocated amount >= required amount. Previously, ANY approved
+  // payment (even partial) would hide the fee from the dues list — leaving
+  // the student with no way to submit the remaining balance.
+  const isFullyCoveredFor = (type, semNo) => {
+    const required  = expectedAmountFor(type, semNo, FEE_REQUIRED[type] || 4500);
+    const approvedAlloc = getApprovedAllocatedFor(type, semNo);
+    return approvedAlloc >= required;
+  };
+
+  const isApprovedFor = (type, semNo) => isFullyCoveredFor(type, semNo);
 
   const isPendingFor = (type, semNo) => payments.some(p =>
     p.paymentType === type
@@ -4107,23 +4153,38 @@ function renderOutstandingDues(s) {
   // 1. Semester fee dues from initNewSemester (warden-created due markers).
   //    A due is only fully cleared when an 'approved' semesterFee payment covers the full amount.
   //    A 'pending' payment does NOT clear the due — it may be partial or unverified.
+  //    BUG FIX (partial payment): A partial approved payment does NOT clear the due.
+  //    Show the balance so the student can submit an additional receipt.
   payments.filter(p => p.paymentType === 'semesterFee_due' && p.status === 'outstanding').forEach(due => {
     const dueAmount = expectedAmountFor('semesterFee', due.semester, Number(due.amount || 4500));
-    const approved = isApprovedFor('semesterFee', due.semester);
-    if(!approved) {
-      const pendingPaid = getAllocatedFor('semesterFee', due.semester);
-      const remaining  = Math.max(0, dueAmount - pendingPaid);
-      const hasPending = isPendingFor('semesterFee', due.semester);
+    const fullyCovered = isFullyCoveredFor('semesterFee', due.semester);
+    if(!fullyCovered) {
+      const approvedAlloc = getApprovedAllocatedFor('semesterFee', due.semester);
+      const pendingPaid   = getAllocatedFor('semesterFee', due.semester);
+      const totalAlloc    = Math.max(approvedAlloc, pendingPaid); // pending includes approved
+      const remaining     = Math.max(0, dueAmount - totalAlloc);
+      const hasPending    = isPendingFor('semesterFee', due.semester);
+      const hasApproved   = approvedAlloc > 0;
+      let note, status;
+      if(hasApproved && remaining > 0) {
+        // Partial approved — show verified amount + balance
+        note = `₹${approvedAlloc.toLocaleString('en-IN')} verified${hasPending ? ' + ₹' + (pendingPaid - approvedAlloc).toLocaleString('en-IN') + ' pending' : ''}. Balance: ₹${remaining.toLocaleString('en-IN')}. Deadline: ${due.deadline || '—'}`;
+        status = 'partial-approved';
+      } else if(hasPending) {
+        note = remaining > 0
+          ? `₹${pendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${remaining.toLocaleString('en-IN')}. Deadline: ${due.deadline || '—'}`
+          : `Full amount submitted, pending verification. Deadline: ${due.deadline || '—'}`;
+        status = 'pending';
+      } else {
+        note = due.deadline ? `Deadline: ${due.deadline}` : '';
+        status = 'unpaid';
+      }
       items.push({
         label: `Hostel Allotment Fee — ${semLabel(due.semester)}`,
         amount: dueAmount,
-        allocatedPending: hasPending ? pendingPaid : 0,
-        note: hasPending
-          ? (remaining > 0
-              ? `₹${pendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${remaining.toLocaleString('en-IN')}. Deadline: ${due.deadline || '—'}`
-              : `Full amount submitted, pending verification. Deadline: ${due.deadline || '—'}`)
-          : (due.deadline ? `Deadline: ${due.deadline}` : ''),
-        status: hasPending ? 'pending' : 'unpaid'
+        allocatedPending: totalAlloc,
+        note: note,
+        status: status
       });
     }
   });
@@ -4131,21 +4192,34 @@ function renderOutstandingDues(s) {
   // 1b. debarred_due: session fee NOT waived on debarment — still owed after debar is lifted.
   //     These appear even when the student is re-approved (debarment lifted) so the fee
   //     doesn't silently disappear when status changes back to 'approved'.
+  //     BUG FIX (partial payment): same partial-approved logic as above.
   payments.filter(p => p.paymentType === 'semesterFee_due' && p.status === 'debarred_due').forEach(due => {
     const dueAmount = expectedAmountFor('semesterFee', due.semester, Number(due.amount || 4500));
-    const approved  = isApprovedFor('semesterFee', due.semester);
-    if(!approved) {
-      const pendingPaid = getAllocatedFor('semesterFee', due.semester);
-      const hasPending  = isPendingFor('semesterFee', due.semester);
-      const remaining   = Math.max(0, dueAmount - pendingPaid);
+    const fullyCovered = isFullyCoveredFor('semesterFee', due.semester);
+    if(!fullyCovered) {
+      const approvedAlloc = getApprovedAllocatedFor('semesterFee', due.semester);
+      const pendingPaid   = getAllocatedFor('semesterFee', due.semester);
+      const totalAlloc    = Math.max(approvedAlloc, pendingPaid);
+      const remaining     = Math.max(0, dueAmount - totalAlloc);
+      const hasPending    = isPendingFor('semesterFee', due.semester);
+      const hasApproved   = approvedAlloc > 0;
+      let note, status;
+      if(hasApproved && remaining > 0) {
+        note = `₹${approvedAlloc.toLocaleString('en-IN')} verified${hasPending ? ' + ₹' + (pendingPaid - approvedAlloc).toLocaleString('en-IN') + ' pending' : ''}. Balance: ₹${remaining.toLocaleString('en-IN')}`;
+        status = 'partial-approved';
+      } else if(hasPending) {
+        note = `₹${pendingPaid.toLocaleString('en-IN')} submitted (pending verification). Balance: ₹${remaining.toLocaleString('en-IN')}`;
+        status = 'pending';
+      } else {
+        note = `Fee was not waived during debarment. Must be paid before No Dues can be issued.`;
+        status = 'unpaid';
+      }
       items.push({
         label: `Hostel Allotment Fee — ${semLabel(due.semester)} (Debarment Fee)`,
         amount: dueAmount,
-        allocatedPending: hasPending ? pendingPaid : 0,
-        note: hasPending
-          ? `₹${pendingPaid.toLocaleString('en-IN')} submitted (pending verification). Balance: ₹${remaining.toLocaleString('en-IN')}`
-          : `Fee was not waived during debarment. Must be paid before No Dues can be issued.`,
-        status: hasPending ? 'pending' : 'unpaid'
+        allocatedPending: totalAlloc,
+        note: note,
+        status: status
       });
     }
   });
@@ -4158,72 +4232,107 @@ function renderOutstandingDues(s) {
   //    admissionSession here would show a stale/wrong old session due.
   const isRenewalStudentDues = !!(s.hostelInfo && s.hostelInfo.roomNo);
   if((s.status === 'provisional' || s.status === 'pending') && !isRenewalStudentDues) {
-    // BUG FIX: Use semesterNo (current approved session) first; admissionSession is
-    // the original admission session and is now preserved separately (never overwritten).
-    // For a brand-new student both are the same, so order here doesn't matter.
     const semNo = String(s.semesterNo || s.admissionSession || '');
     const alreadyCovered = payments.some(p => p.paymentType === 'semesterFee_due' && String(p.sessionId||p.semester||'') === semNo);
     if(!alreadyCovered) {
-      const semApproved = isApprovedFor('semesterFee', semNo);
-      if(!semApproved) {
-        const semPendingPaid = getAllocatedFor('semesterFee', semNo);
-        const semRequired    = expectedAmountFor('semesterFee', semNo, 4500);
-        const semRemaining   = Math.max(0, semRequired - semPendingPaid);
-        const hasSemPending  = isPendingFor('semesterFee', semNo);
+      const semFullyCovered = isFullyCoveredFor('semesterFee', semNo);
+      if(!semFullyCovered) {
+        const semApprovedAlloc = getApprovedAllocatedFor('semesterFee', semNo);
+        const semPendingPaid   = getAllocatedFor('semesterFee', semNo);
+        const semTotalAlloc    = Math.max(semApprovedAlloc, semPendingPaid);
+        const semRequired      = expectedAmountFor('semesterFee', semNo, 4500);
+        const semRemaining     = Math.max(0, semRequired - semTotalAlloc);
+        const hasSemPending    = isPendingFor('semesterFee', semNo);
+        const hasSemApproved   = semApprovedAlloc > 0;
+        let semNote, semStatus;
+        if(hasSemApproved && semRemaining > 0) {
+          semNote = `₹${semApprovedAlloc.toLocaleString('en-IN')} verified${hasSemPending ? ' + ₹' + (semPendingPaid - semApprovedAlloc).toLocaleString('en-IN') + ' pending' : ''}. Balance: ₹${semRemaining.toLocaleString('en-IN')}`;
+          semStatus = 'partial-approved';
+        } else if(hasSemPending) {
+          semNote = semRemaining > 0
+            ? `₹${semPendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${semRemaining.toLocaleString('en-IN')}`
+            : 'Full amount submitted, pending verification';
+          semStatus = 'pending';
+        } else {
+          semNote = 'Required to confirm your hostel seat';
+          semStatus = 'unpaid';
+        }
         items.push({
           label: `Hostel Allotment Fee — ${semLabel(semNo)}`,
           amount: semRequired,
-          allocatedPending: hasSemPending ? semPendingPaid : 0,
-          note: hasSemPending
-            ? (semRemaining > 0
-                ? `₹${semPendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${semRemaining.toLocaleString('en-IN')}`
-                : 'Full amount submitted, pending verification')
-            : 'Required to confirm your hostel seat',
-          status: hasSemPending ? 'pending' : 'unpaid'
+          allocatedPending: semTotalAlloc,
+          note: semNote,
+          status: semStatus
         });
       }
     }
   }
 
-  // 3. Registration Fee — outstanding until APPROVED; partial payments shown with balance.
+  // 3. Registration Fee — outstanding until fully covered by APPROVED payments.
+  //    BUG FIX (partial payment): partial approved payments don't clear the fee.
   //    Only for genuinely new (non-renewal) students.
   const isNewStudent = (s.status === 'provisional' || s.status === 'pending') && !isRenewalStudentDues;
-  const regApproved = isApprovedFor('registrationFee');
-  if(!regApproved && isNewStudent) {
-    const regPendingPaid = getAllocatedFor('registrationFee');
-    const regRequired    = expectedAmountFor('registrationFee', undefined, 500);
-    const regRemaining   = Math.max(0, regRequired - regPendingPaid);
-    const hasRegPending  = isPendingFor('registrationFee');
+  const regFullyCovered = isFullyCoveredFor('registrationFee');
+  if(!regFullyCovered && isNewStudent) {
+    const regApprovedAlloc = getApprovedAllocatedFor('registrationFee');
+    const regPendingPaid   = getAllocatedFor('registrationFee');
+    const regTotalAlloc    = Math.max(regApprovedAlloc, regPendingPaid);
+    const regRequired      = expectedAmountFor('registrationFee', undefined, 500);
+    const regRemaining     = Math.max(0, regRequired - regTotalAlloc);
+    const hasRegPending    = isPendingFor('registrationFee');
+    const hasRegApproved   = regApprovedAlloc > 0;
+    let regNote, regStatus;
+    if(hasRegApproved && regRemaining > 0) {
+      regNote = `₹${regApprovedAlloc.toLocaleString('en-IN')} verified${hasRegPending ? ' + ₹' + (regPendingPaid - regApprovedAlloc).toLocaleString('en-IN') + ' pending' : ''}. Balance: ₹${regRemaining.toLocaleString('en-IN')}`;
+      regStatus = 'partial-approved';
+    } else if(hasRegPending) {
+      regNote = regRemaining > 0
+        ? `₹${regPendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${regRemaining.toLocaleString('en-IN')}`
+        : 'Receipt submitted, pending verification';
+      regStatus = 'pending';
+    } else {
+      regNote = 'One-time, non-refundable';
+      regStatus = 'unpaid';
+    }
     items.push({
       label: 'Registration Fee (one-time)',
       amount: regRequired,
-      allocatedPending: hasRegPending ? regPendingPaid : 0,
-      note: hasRegPending
-        ? (regRemaining > 0
-            ? `₹${regPendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${regRemaining.toLocaleString('en-IN')}`
-            : 'Receipt submitted, pending verification')
-        : 'One-time, non-refundable',
-      status: hasRegPending ? 'pending' : 'unpaid'
+      allocatedPending: regTotalAlloc,
+      note: regNote,
+      status: regStatus
     });
   }
 
-  // 4. Caution Money — outstanding until APPROVED; partial payments shown with balance.
-  const cautionApproved = isApprovedFor('cautionMoney');
-  if(!cautionApproved && isNewStudent) {
-    const cautionPendingPaid = getAllocatedFor('cautionMoney');
-    const cautionRequired    = expectedAmountFor('cautionMoney', undefined, 1500);
-    const cautionRemaining   = Math.max(0, cautionRequired - cautionPendingPaid);
-    const hasCautionPending  = isPendingFor('cautionMoney');
+  // 4. Caution Money — outstanding until fully covered by APPROVED payments.
+  //    BUG FIX (partial payment): partial approved payments don't clear the fee.
+  const cautionFullyCovered = isFullyCoveredFor('cautionMoney');
+  if(!cautionFullyCovered && isNewStudent) {
+    const cautionApprovedAlloc = getApprovedAllocatedFor('cautionMoney');
+    const cautionPendingPaid   = getAllocatedFor('cautionMoney');
+    const cautionTotalAlloc    = Math.max(cautionApprovedAlloc, cautionPendingPaid);
+    const cautionRequired      = expectedAmountFor('cautionMoney', undefined, 1500);
+    const cautionRemaining     = Math.max(0, cautionRequired - cautionTotalAlloc);
+    const hasCautionPending    = isPendingFor('cautionMoney');
+    const hasCautionApproved   = cautionApprovedAlloc > 0;
+    let cautionNote, cautionStatus;
+    if(hasCautionApproved && cautionRemaining > 0) {
+      cautionNote = `₹${cautionApprovedAlloc.toLocaleString('en-IN')} verified${hasCautionPending ? ' + ₹' + (cautionPendingPaid - cautionApprovedAlloc).toLocaleString('en-IN') + ' pending' : ''}. Balance: ₹${cautionRemaining.toLocaleString('en-IN')}`;
+      cautionStatus = 'partial-approved';
+    } else if(hasCautionPending) {
+      cautionNote = cautionRemaining > 0
+        ? `₹${cautionPendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${cautionRemaining.toLocaleString('en-IN')}`
+        : 'Receipt submitted, pending verification';
+      cautionStatus = 'pending';
+    } else {
+      cautionNote = 'Refundable on vacating after No Dues';
+      cautionStatus = 'unpaid';
+    }
     items.push({
       label: 'Caution Money (one-time, refundable)',
       amount: cautionRequired,
-      allocatedPending: hasCautionPending ? cautionPendingPaid : 0,
-      note: hasCautionPending
-        ? (cautionRemaining > 0
-            ? `₹${cautionPendingPaid.toLocaleString('en-IN')} allocated (pending verification). Balance: ₹${cautionRemaining.toLocaleString('en-IN')}`
-            : 'Receipt submitted, pending verification')
-        : 'Refundable on vacating after No Dues',
-      status: hasCautionPending ? 'pending' : 'unpaid'
+      allocatedPending: cautionTotalAlloc,
+      note: cautionNote,
+      status: cautionStatus
     });
   }
 
@@ -4259,6 +4368,7 @@ function renderOutstandingDues(s) {
 
   const statusBadge = st => {
     if(st === 'pending') return '<span class="badge badge-pending" style="font-size:10px">⏳ Pending Verification</span>';
+    if(st === 'partial-approved') return '<span class="badge" style="background:#e8f5e9;color:#1b5e20;font-size:10px">✓ Partial — Pay Balance</span>';
     return '<span style="background:var(--danger-bg);color:var(--danger);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600">⚠ Unpaid</span>';
   };
 
@@ -4526,88 +4636,93 @@ function renderPaymentActions(s) {
   const isNewStudentPay = (s.status === 'provisional' || s.status === 'pending') && !isRenewalStudent;
   if(isNewStudentPay) {
     // Semester fee (no semesterFee_due marker needed for new students)
-    // BUG FIX: semesterNo holds the current/active session (updated on each approval).
-    // admissionSession is the original admission year (preserved after the backend fix).
-    // For new students both are identical; prefer semesterNo for forward compatibility.
+    // BUG FIX (partial payment): previously, ANY approved semesterFee payment would
+    // hide this fee from the action form, leaving no way to submit the remaining
+    // balance. Now we check if the total APPROVED amount covers the required amount.
     const admSem = String(s.semesterNo || s.admissionSession || '');
     const alreadyCovered = payableItems.some(it => it.paymentType === 'semesterFee' && it.semester === admSem);
     if(!alreadyCovered) {
-      const existingApproved = payments.find(p => p.paymentType === 'semesterFee'
+      const existingApproved = payments.filter(p => p.paymentType === 'semesterFee'
         && String(p.semester) === admSem && p.status === 'approved');
       const existingPending = payments.filter(p => p.paymentType === 'semesterFee'
         && String(p.semester) === admSem && p.status === 'pending');
-      if(!existingApproved) {
-        const semRequired = 4500;
-        const paidSoFar   = existingPending.reduce((a,p)=>a+Number(p.amount||0),0);
-        const semBalance  = Math.max(0, semRequired - paidSoFar);
-        // Only show in action form if there is still a balance to pay
-        if(semBalance > 0 && !existingPending.length) {
-          // No pending at all — show full fee
-          payableItems.push({
-            paymentType: 'semesterFee', semester: admSem,
-            label: feeLabel(admSem, 'semesterFee'),
-            note: 'Required to confirm your hostel seat',
-            amount: semRequired, key: 'sem-' + admSem
-          });
-        } else if(semBalance > 0 && existingPending.length) {
-          // Partial payment submitted — show balance only in action form
-          payableItems.push({
-            paymentType: 'semesterFee', semester: admSem,
-            label: feeLabel(admSem, 'semesterFee') + ' (balance)',
-            note: `₹${paidSoFar.toLocaleString('en-IN')} submitted, ₹${semBalance.toLocaleString('en-IN')} remaining`,
-            amount: semBalance, key: 'sem-' + admSem
-          });
-        }
-        // If semBalance === 0, full amount is covered pending — no action needed
+      const semRequired = 4500;
+      const approvedAmt = existingApproved.reduce((a,p)=>a+Number(p.amount||0),0);
+      const pendingAmt  = existingPending.reduce((a,p)=>a+Number(p.amount||0),0);
+      const totalPaid   = approvedAmt + pendingAmt;
+      const semBalance  = Math.max(0, semRequired - totalPaid);
+      // Only show in action form if there is still a balance to pay
+      if(semBalance > 0 && !existingPending.length) {
+        // No pending — show balance (may include already-approved partial amount)
+        payableItems.push({
+          paymentType: 'semesterFee', semester: admSem,
+          label: approvedAmt > 0 ? feeLabel(admSem, 'semesterFee') + ' (balance)' : feeLabel(admSem, 'semesterFee'),
+          note: approvedAmt > 0
+            ? `₹${approvedAmt.toLocaleString('en-IN')} verified, ₹${semBalance.toLocaleString('en-IN')} remaining`
+            : 'Required to confirm your hostel seat',
+          amount: semBalance, key: 'sem-' + admSem
+        });
+      } else if(semBalance > 0 && existingPending.length) {
+        // Partial payment submitted (pending) — show balance only in action form
+        payableItems.push({
+          paymentType: 'semesterFee', semester: admSem,
+          label: feeLabel(admSem, 'semesterFee') + ' (balance)',
+          note: `₹${totalPaid.toLocaleString('en-IN')} submitted, ₹${semBalance.toLocaleString('en-IN')} remaining`,
+          amount: semBalance, key: 'sem-' + admSem
+        });
       }
+      // If semBalance === 0, full amount is covered — no action needed
     }
 
-    // Registration fee — show balance if partial payment was submitted
-    const regApprovedAct = payments.find(p => p.paymentType === 'registrationFee' && p.status === 'approved');
+    // Registration fee — show balance if partial payment was submitted or partially approved
+    // BUG FIX (partial payment): previously, ANY approved payment would hide this fee,
+    // leaving no way to submit the remaining balance. Now we check if the total
+    // APPROVED amount covers the required amount.
+    const regApprovedAct = payments.filter(p => p.paymentType === 'registrationFee' && p.status === 'approved');
     const regPendingAct  = payments.filter(p => p.paymentType === 'registrationFee' && p.status === 'pending');
-    if(!regApprovedAct) {
-      const regRequired = 500;
-      const regPaid     = regPendingAct.reduce((a,p)=>a+Number(p.amount||0),0);
-      const regBalance  = Math.max(0, regRequired - regPaid);
-      if(regBalance > 0 && !regPendingAct.length) {
-        payableItems.push({
-          paymentType: 'registrationFee',
-          label: 'Registration Fee (one-time, non-refundable)',
-          note: '',
-          amount: regRequired, key: 'reg'
-        });
-      } else if(regBalance > 0 && regPendingAct.length) {
-        payableItems.push({
-          paymentType: 'registrationFee',
-          label: 'Registration Fee (balance)',
-          note: `₹${regPaid.toLocaleString('en-IN')} submitted, ₹${regBalance.toLocaleString('en-IN')} remaining`,
-          amount: regBalance, key: 'reg'
-        });
-      }
+    const regApprovedAmt = regApprovedAct.reduce((a,p)=>a+Number(p.amount||0),0);
+    const regRequired    = 500;
+    const regPaid        = regPendingAct.reduce((a,p)=>a+Number(p.amount||0),0) + regApprovedAmt;
+    const regBalance     = Math.max(0, regRequired - regPaid);
+    if(regBalance > 0 && !regPendingAct.length) {
+      // No pending — show balance (may include already-approved partial amount)
+      payableItems.push({
+        paymentType: 'registrationFee',
+        label: regApprovedAmt > 0 ? 'Registration Fee (balance)' : 'Registration Fee (one-time, non-refundable)',
+        note: regApprovedAmt > 0 ? `₹${regApprovedAmt.toLocaleString('en-IN')} verified, ₹${regBalance.toLocaleString('en-IN')} remaining` : '',
+        amount: regBalance, key: 'reg'
+      });
+    } else if(regBalance > 0 && regPendingAct.length) {
+      payableItems.push({
+        paymentType: 'registrationFee',
+        label: 'Registration Fee (balance)',
+        note: `₹${regPaid.toLocaleString('en-IN')} submitted, ₹${regBalance.toLocaleString('en-IN')} remaining`,
+        amount: regBalance, key: 'reg'
+      });
     }
 
-    // Caution money — show balance if partial payment was submitted
-    const cautionApprovedAct = payments.find(p => p.paymentType === 'cautionMoney' && p.status === 'approved');
+    // Caution money — show balance if partial payment was submitted or partially approved
+    // BUG FIX (partial payment): same logic as registration fee above.
+    const cautionApprovedAct = payments.filter(p => p.paymentType === 'cautionMoney' && p.status === 'approved');
     const cautionPendingAct  = payments.filter(p => p.paymentType === 'cautionMoney' && p.status === 'pending');
-    if(!cautionApprovedAct) {
-      const cautionRequired = 1500;
-      const cautionPaid     = cautionPendingAct.reduce((a,p)=>a+Number(p.amount||0),0);
-      const cautionBalance  = Math.max(0, cautionRequired - cautionPaid);
-      if(cautionBalance > 0 && !cautionPendingAct.length) {
-        payableItems.push({
-          paymentType: 'cautionMoney',
-          label: 'Caution Money (one-time, refundable on vacating)',
-          note: '',
-          amount: cautionRequired, key: 'caution'
-        });
-      } else if(cautionBalance > 0 && cautionPendingAct.length) {
-        payableItems.push({
-          paymentType: 'cautionMoney',
-          label: 'Caution Money (balance)',
-          note: `₹${cautionPaid.toLocaleString('en-IN')} submitted, ₹${cautionBalance.toLocaleString('en-IN')} remaining`,
-          amount: cautionBalance, key: 'caution'
-        });
-      }
+    const cautionApprovedAmt = cautionApprovedAct.reduce((a,p)=>a+Number(p.amount||0),0);
+    const cautionRequired    = 1500;
+    const cautionPaid        = cautionPendingAct.reduce((a,p)=>a+Number(p.amount||0),0) + cautionApprovedAmt;
+    const cautionBalance     = Math.max(0, cautionRequired - cautionPaid);
+    if(cautionBalance > 0 && !cautionPendingAct.length) {
+      payableItems.push({
+        paymentType: 'cautionMoney',
+        label: cautionApprovedAmt > 0 ? 'Caution Money (balance)' : 'Caution Money (one-time, refundable on vacating)',
+        note: cautionApprovedAmt > 0 ? `₹${cautionApprovedAmt.toLocaleString('en-IN')} verified, ₹${cautionBalance.toLocaleString('en-IN')} remaining` : '',
+        amount: cautionBalance, key: 'caution'
+      });
+    } else if(cautionBalance > 0 && cautionPendingAct.length) {
+      payableItems.push({
+        paymentType: 'cautionMoney',
+        label: 'Caution Money (balance)',
+        note: `₹${cautionPaid.toLocaleString('en-IN')} submitted, ₹${cautionBalance.toLocaleString('en-IN')} remaining`,
+        amount: cautionBalance, key: 'caution'
+      });
     }
   }
 
