@@ -1321,9 +1321,19 @@
                 <div class="hint">Optional — leave blank if open-ended</div>
               </div>
             </div>
+            <!-- BUG FIX: Manual payment deadline (warden-decided, NOT auto-calculated) -->
+            <div class="form-row" style="margin-bottom:12px">
+              <div class="field" style="margin-bottom:0">
+                <label>Payment Deadline <span class="req">*</span></label>
+                <input type="date" id="dw-newsemester-deadline"/>
+                <div class="hint" id="deadline-hint" style="color:var(--danger);font-weight:600">
+                  ⚠ The warden must set this deadline manually. It is no longer auto-calculated.
+                </div>
+              </div>
+            </div>
             <!-- Fee due preview -->
             <div style="background:#fff;border:1.5px dashed #c8973a;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--navy)">
-              🏷️ On activation: Hostel Fee <strong>₹4,500</strong> will appear as due on all currently Approved (registered) student accounts for session <strong id="session-id-preview-inline">—</strong>. Payment deadline auto-calculated by Panel 4 (10 days from session start).
+              🏷️ On activation: Hostel Fee <strong>₹4,500</strong> will appear as due on all currently Approved (registered) student accounts for session <strong id="session-id-preview-inline">—</strong>. Payment deadline is set by the warden above. Late fine ₹50/day (max ₹500) applies after the deadline.
             </div>
             <div id="dw-newsemester-status" style="font-size:12px;margin-bottom:10px"></div>
             <div id="sem-init-result" style="margin-bottom:8px"></div>
@@ -1359,14 +1369,14 @@
           </div>
           <div style="padding:18px 20px">
             <div style="background:#ede7f6;border:1px solid #b39ddb;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#3a1a7c;display:flex;align-items:flex-start;gap:8px">
-              <span style="font-size:16px;flex-shrink:0">🤖</span>
-              <div><strong>Auto-Calculated:</strong> Once a semester session is activated via Panel 3, this deadline is automatically set to <strong>10 days from the session start date</strong>. No manual entry needed. If ₹4,500 is unpaid after this deadline, a late fine of ₹50/day (max ₹500) is applied automatically to each registered student.</div>
+              <span style="font-size:16px;flex-shrink:0">👤</span>
+              <div><strong>Warden-Set:</strong> The payment deadline is now set manually by the Warden in Panel 3 when activating a new session. It is <strong>no longer auto-calculated</strong>. If ₹4,500 is unpaid after this deadline, a late fine of ₹50/day (max ₹500) is applied automatically to each registered student.</div>
             </div>
             <!-- Current deadline display -->
             <div style="background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
               <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;letter-spacing:.3px;text-transform:uppercase">Current Session Payment Deadline</div>
               <div id="dw-p4-deadline-info">
-                <div style="font-size:12px;color:var(--gray-400);font-style:italic">Activate a semester in Panel 3 to see the auto-calculated deadline here.</div>
+                <div style="font-size:12px;color:var(--gray-400);font-style:italic">Activate a semester in Panel 3 to see the warden-set deadline here.</div>
               </div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -2464,7 +2474,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // 1. Log it to the console (F12 → Console)
 // 2. Display it in a visible banner on the Download Provisional Letter page
 // If the version doesn't say "v20.4", the new code hasn't been deployed yet.
-const EXPECTED_BACKEND_VERSION = 'v20.6';
+const EXPECTED_BACKEND_VERSION = 'v21.0';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -5690,14 +5700,11 @@ async function openApprove(rollFull, viewOnly=false) {
     const dueDateDiv = document.createElement('div');
     dueDateDiv.id = 'wr-new-due-date';
 
-    // Auto-populate due date from the admin-configured application window end date (Panel 1).
-    // If the admin has not set a deadline yet, fall back to +30 days from today.
-    const _adminDeadline = window._adminProvDeadline || '';
-    const _fallbackDate  = new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10);
-    const defaultDueDate = _adminDeadline || _fallbackDate;
-    const _dateSource    = _adminDeadline
-      ? '<span style="color:var(--success);font-weight:600">✅ Auto-filled from Admin-set Application Deadline (' + _adminDeadline + ')</span>'
-      : '<span style="color:var(--warning)">⚠ No deadline set by Admin — defaulted to +30 days. Set it in <strong>Date Settings → Panel 1</strong>.</span>';
+    // BUG FIX: The payment deadline defaults to 5 days from today (auto-calculated),
+    // but the warden CAN manually override it if needed. The input is pre-filled
+    // with the 5-day default so the warden can either accept it as-is or change it.
+    const _autoDeadline = new Date(Date.now() + 5*24*60*60*1000).toISOString().slice(0,10);
+    const _autoDeadlineDisplay = new Date(Date.now() + 5*24*60*60*1000).toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
 
     dueDateDiv.innerHTML = `
       <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
@@ -5710,9 +5717,12 @@ async function openApprove(rollFull, viewOnly=false) {
       </div>
       <div class="field">
         <label>Fee Payment Due Date <span class="req">*</span></label>
-        <input type="date" id="wr-prov-due-date" value="${defaultDueDate}"/>
-        <div class="hint" id="wr-prov-due-hint" style="margin-top:5px">${_dateSource}</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:3px">Student must pay fees before this date to confirm their allotment. You may adjust if needed.</div>
+        <input type="date" id="wr-prov-due-date" value="${_autoDeadline}" min="${new Date().toISOString().split('T')[0]}"/>
+        <div class="hint" id="wr-prov-due-hint" style="margin-top:5px">
+          <span style="color:var(--success);font-weight:600">✅ Auto-filled: 5 days from today (${_autoDeadlineDisplay}).</span>
+          <span style="color:var(--gray-600)">You may change this date if needed.</span><br/>
+          <span style="font-size:11px;color:var(--gray-500)">Late fine ₹50/day (max ₹500) applies after this date — visible to both student and Warden in real time.</span>
+        </div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
         <button class="btn btn-primary" id="wr-approve-btn-new" onclick="doProvisionalApprove('${s.rollFull}')">
@@ -6467,6 +6477,7 @@ async function initNewSemesterV2() {
   const semType      = document.getElementById('sem-type-select')?.value.trim();
   const semYear      = document.getElementById('sem-year-select')?.value.trim();
   const sessionStart = document.getElementById('dw-newsemester-start')?.value.trim();
+  const deadline     = document.getElementById('dw-newsemester-deadline')?.value.trim(); // BUG FIX: warden-set deadline
   const resultEl     = document.getElementById('sem-init-result');
 
   if(!semType || !semYear) {
@@ -6474,21 +6485,24 @@ async function initNewSemesterV2() {
     return;
   }
   if(!sessionStart) {
-    if(resultEl) resultEl.innerHTML='<div class="alert alert-danger">Please set a session start date (used to auto-calculate the 10-day payment deadline).</div>';
+    if(resultEl) resultEl.innerHTML='<div class="alert alert-danger">Please set a session start date.</div>';
+    return;
+  }
+  // BUG FIX: The deadline must be set manually by the warden — it is no longer
+  // auto-calculated as sessionStart + 10 days.
+  if(!deadline) {
+    if(resultEl) resultEl.innerHTML='<div class="alert alert-danger">⚠ Please set the Payment Deadline manually. It is no longer auto-calculated.</div>';
+    document.getElementById('dw-newsemester-deadline')?.focus();
     return;
   }
 
   const sessionId = semType + ' ' + semYear;  // e.g. "Odd 2026"
 
-  // Auto-calculate deadline = sessionStart + 10 days
-  const deadlineDate = new Date(new Date(sessionStart).getTime() + 10*86400000);
-  const deadline     = deadlineDate.toISOString().split('T')[0];
-
   const confirmed = confirm(
     `⚠ SESSION ACTIVATION\n\n` +
     `Session:          ${sessionId}\n` +
     `Session Start:    ${_fmtDate(sessionStart)}\n` +
-    `Payment Deadline: ${_fmtDate(deadline)} (auto: +10 days)\n\n` +
+    `Payment Deadline: ${_fmtDate(deadline)} (warden-set)\n\n` +
     `This will:\n` +
     `• Add ₹4,500 hostel fee as DUE on ALL currently Approved student accounts\n` +
     `• Set payment deadline to ${_fmtDate(deadline)}\n` +
@@ -6512,7 +6526,7 @@ async function initNewSemesterV2() {
     semType,
     semYear,
     sessionStart,
-    deadline
+    deadline      // BUG FIX: pass the warden-set deadline (not auto-calculated)
   });
 
   if(btn) { btn.disabled=false; btn.innerHTML='🎓 Activate New Session'; }
@@ -6584,12 +6598,15 @@ async function issueHDNForStudent(rollFull) {
 
 // ── PROVISIONAL APPROVE (new students — warden issues provisional allotment letter) ──
 // Room / bed assignment happens at FINAL approval after fee payment, not at provisional stage.
+// BUG FIX: The due date input is pre-filled with 5 days from today (auto-calculated),
+// but the warden can change it. The warden-set date is sent to the backend.
 async function doProvisionalApprove(rollFull) {
-  const dueDate = document.getElementById('wr-prov-due-date')?.value;
+  const dueDateInput = document.getElementById('wr-prov-due-date');
+  const dueDate = dueDateInput?.value;
   const btn = document.getElementById('wr-approve-btn-new') || document.getElementById('wr-approve-btn');
   if(btn) { btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Issuing Provisional Letter…'; }
 
-  // Validate due date
+  // Validate due date — the warden must set a date (pre-filled with 5 days from today)
   if(!dueDate) {
     const res = document.getElementById('wr-prov-issue-result');
     if(res) res.innerHTML='<div class="alert alert-danger">Please set a fee payment due date.</div>';
@@ -6605,14 +6622,15 @@ async function doProvisionalApprove(rollFull) {
   const r = await callBackend('provisionalApprove', {
     rollFull,
     hostelInfo: null,   // no room assignment at provisional stage
-    dueDate: dueDateDisplay,
+    dueDate: dueDateDisplay,   // warden-set date (defaults to 5 days from today)
+    dueDateISO: dueDate,       // YYYY-MM-DD for storage
     refNo: `GPMH/HPA/${rollFull}`
   });
 
   if(btn) { btn.disabled=false; btn.innerHTML='📋 Issue Provisional Allotment Letter'; }
 
   if(r.success) {
-    toast(`Provisional Allotment Letter issued! Ref: ${r.refNo}. Student can download with their Access Key.`, 'success');
+    toast(`Provisional Allotment Letter issued! Ref: ${r.refNo}. Payment deadline: ${dueDateDisplay}. Student can download with their Access Key.`, 'success');
     const idx = wrStudents.findIndex(x=>x.rollFull===rollFull);
     if(idx>=0) { wrStudents[idx].status='provisional'; }
     wrCloseApprove();
@@ -8725,6 +8743,18 @@ function admRenderPayList() {
         const exp  = expectedFee(p);
         const paid = Number(p.amount||0);
         const bal  = Math.max(0,exp-paid);
+        const isFullyCovered = bal === 0;
+        const checkboxCell = hasPending
+          ? `<td style="padding:5px 8px;text-align:center">
+               <input type="checkbox" class="adm-pay-checkbox"
+                 data-idx="${p._idx}"
+                 data-roll="${s.rollFull}"
+                 data-key="${key}"
+                 ${isFullyCovered ? 'checked' : ''}
+                 style="cursor:pointer;width:16px;height:16px;accent-color:var(--success)"
+                 title="${isFullyCovered ? 'This fee is fully covered — verify it' : 'Check to verify this fee'}"/>
+             </td>`
+          : '';
         return `<tr>
           <td style="padding:5px 8px;font-size:12px;font-weight:500">${ftName(p)}</td>
           <td style="padding:5px 8px;font-size:12px;color:var(--gray-600);text-align:right">₹${exp.toLocaleString('en-IN')}</td>
@@ -8732,8 +8762,17 @@ function admRenderPayList() {
           <td style="padding:5px 8px;font-size:12px;font-weight:600;text-align:right;color:${bal>0?'var(--danger)':'var(--success)'}">
             ${bal>0?`₹${bal.toLocaleString('en-IN')} due`:'<span style="color:var(--success)">✓ Full</span>'}
           </td>
+          ${checkboxCell}
         </tr>`;
       }).join('');
+
+      // Header cell for the checkbox column (only shown when pending)
+      const checkboxHeader = hasPending
+        ? '<th style="padding:5px 8px;font-size:10px;text-align:center;color:#fff;text-transform:uppercase;width:50px">Verify?</th>'
+        : '';
+      const totalCheckboxCell = hasPending
+        ? '<td style="padding:6px 8px;text-align:center"><input type="checkbox" class="adm-pay-select-all" data-roll="'+s.rollFull+'" data-key="'+key+'" style="cursor:pointer;width:16px;height:16px;accent-color:var(--success)" title="Select/deselect all" onclick="admToggleAllFees(this)"/></td>'
+        : '';
 
       return `
       <div style="border:1.5px solid ${isRejected?'var(--danger)':hasPending?'var(--navy)':'var(--gray-200)'};border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px;background:${isRejected?'var(--danger-bg)':'#fff'}">
@@ -8752,11 +8791,13 @@ function admRenderPayList() {
             </div>
             ${isRejected&&rejComment?`<div style="font-size:11px;color:var(--danger);margin-top:4px;font-weight:600">✗ Rejection on file: ${rejComment}</div>`:''}
           </div>
-          <!-- Action buttons — ONE pair for the whole batch -->
+          <!-- Action buttons — Verify All / Verify Selected / Reject -->
           ${hasPending?`
-          <div style="display:flex;gap:6px;flex-shrink:0">
+          <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
             <button class="btn btn-success btn-sm" style="font-size:11px"
               onclick="admApprovePaymentBatch('${s.rollFull}',${indicesJson})">✓ Verify All</button>
+            ${isPartial?`<button class="btn btn-primary btn-sm" style="font-size:11px"
+              onclick="admApproveSelected('${s.rollFull}','${key}',this)">✓ Verify Selected</button>`:''}
             <button class="btn btn-danger btn-sm" style="font-size:11px"
               onclick="admRejectPaymentBatch('${s.rollFull}',${indicesJson},'${rejId}',this)">✗ Reject</button>
           </div>`:(isRejected?`
@@ -8767,6 +8808,13 @@ function admRenderPayList() {
           }
         </div>
 
+        ${isPartial && hasPending ? `
+        <div style="background:#eef3ff;border:1px solid #c5d3f0;border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--navy);line-height:1.5">
+          <strong>📋 Partial Payment:</strong> This receipt doesn't cover all fees. By default, fully-covered fees are checked for verification.
+          Uncheck any fee you don't want to verify, then click <strong>"Verify Selected"</strong>. Unchecked fees will remain pending
+          (or you can reject them separately).
+        </div>` : ''}
+
         <!-- Fee breakdown table -->
         <div style="margin-bottom:10px">
           <div style="font-size:10px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Fee Breakdown</div>
@@ -8776,6 +8824,7 @@ function admRenderPayList() {
               <th style="padding:5px 8px;font-size:10px;text-align:right;color:#fff;text-transform:uppercase">Required</th>
               <th style="padding:5px 8px;font-size:10px;text-align:right;color:#fff;text-transform:uppercase">Paid</th>
               <th style="padding:5px 8px;font-size:10px;text-align:right;color:#fff;text-transform:uppercase">Balance</th>
+              ${checkboxHeader}
             </tr></thead>
             <tbody style="background:var(--gray-50)">${feeRows}</tbody>
             <tfoot><tr style="background:var(--gray-100);border-top:2px solid var(--gray-200)">
@@ -8785,6 +8834,7 @@ function admRenderPayList() {
               <td style="padding:6px 8px;font-size:12px;font-weight:700;text-align:right;color:${isPartial?'var(--danger)':'var(--success)'}">
                 ${isPartial?`₹${shortfall.toLocaleString('en-IN')} outstanding`:'✓ Fully paid'}
               </td>
+              ${totalCheckboxCell}
             </tfoot>
           </table>
         </div>
@@ -8938,6 +8988,68 @@ async function admApprovePaymentBatch(rollFull, indices) {
     const rd = await callBackend('getAllStudents');
     if(rd.success) { admStudents=rd.students; admRenderStats(); admRenderPayList(); }
   } else { toast('Failed: '+(r.error||''), 'error'); }
+}
+
+// ── VERIFY SELECTED: approves only the fees the admin checked ───────────────
+// BUG FIX (partial payment): previously, the admin could only "Verify All" or
+// "Reject" — no way to verify just the fees that were actually covered by a
+// partial payment. This function reads the checkboxes in the fee breakdown
+// table and calls approvePaymentBatch with only the selected indices.
+async function admApproveSelected(rollFull, receiptKey, btn) {
+  // Find all checkboxes for this receipt
+  const checkboxes = document.querySelectorAll(`.adm-pay-checkbox[data-roll="${rollFull}"][data-key="${receiptKey}"]`);
+  const selectedIndices = [];
+  checkboxes.forEach(cb => {
+    if(cb.checked) {
+      selectedIndices.push(Number(cb.dataset.idx));
+    }
+  });
+
+  if(selectedIndices.length === 0) {
+    toast('Please check at least one fee to verify.', 'error');
+    return;
+  }
+
+  // Confirm with the admin
+  const allIndices = Array.from(checkboxes).map(cb => Number(cb.dataset.idx));
+  const uncheckedCount = allIndices.length - selectedIndices.length;
+  let confirmMsg = `Verify ${selectedIndices.length} fee(s) for ${rollFull}?`;
+  if(uncheckedCount > 0) {
+    confirmMsg += `\n\n${uncheckedCount} fee(s) will remain pending and can be rejected or verified later.`;
+  }
+  if(!confirm(confirmMsg)) return;
+
+  // Disable the button and show a spinner
+  if(btn) {
+    btn.disabled = true;
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner spinner-dark"></span> Verifying…';
+  }
+
+  try {
+    const r = await callBackend('approvePaymentBatch', {rollFull, paymentIndices: selectedIndices});
+    if(r.success) {
+      toast(`${selectedIndices.length} fee(s) verified ✓`, 'success');
+      const rd = await callBackend('getAllStudents');
+      if(rd.success) { admStudents = rd.students; admRenderStats(); admRenderPayList(); }
+    } else {
+      toast('Failed: ' + (r.error || ''), 'error');
+      if(btn) { btn.disabled = false; btn.innerHTML = btn.dataset.originalHtml || '✓ Verify Selected'; }
+    }
+  } catch(e) {
+    toast('Error: ' + (e.message || 'Unknown error'), 'error');
+    if(btn) { btn.disabled = false; btn.innerHTML = btn.dataset.originalHtml || '✓ Verify Selected'; }
+  }
+}
+
+// ── TOGGLE ALL FEES: select/deselect all checkboxes in a receipt ────────────
+function admToggleAllFees(selectAllCheckbox) {
+  const rollFull = selectAllCheckbox.dataset.roll;
+  const receiptKey = selectAllCheckbox.dataset.key;
+  const checkboxes = document.querySelectorAll(`.adm-pay-checkbox[data-roll="${rollFull}"][data-key="${receiptKey}"]`);
+  checkboxes.forEach(cb => {
+    cb.checked = selectAllCheckbox.checked;
+  });
 }
 
 // Show inline rejection form for a batch
