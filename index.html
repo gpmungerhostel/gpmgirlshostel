@@ -581,8 +581,6 @@
         <div class="err-msg hidden" id="err-dl-access-key"></div>
       </div>
       <div class="err-msg hidden" id="err-dl-verify" style="margin-bottom:12px"></div>
-      <!-- Debug alert — shown when the backend returns diagnostic info -->
-      <div id="dl-debug-alert" class="alert alert-warning hidden" style="margin-bottom:12px;font-size:11px;line-height:1.5"></div>
       <button class="btn btn-primary" style="width:100%" onclick="verifyAndDownload()" id="dl-verify-btn">
         🔍 Verify &amp; Get Letter
       </button>
@@ -965,6 +963,15 @@
 
       <!-- Applications Tab -->
       <div id="wr-tab-applications">
+        <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="position:relative;flex:1;min-width:200px;max-width:380px">
+            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:14px;pointer-events:none">🔍</span>
+            <input id="wr-applications-search" type="text" placeholder="Search by name or roll number…"
+              style="width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:var(--transition)"
+              oninput="wrFilterApplications()" onfocus="this.style.borderColor='var(--navy-mid)'" onblur="this.style.borderColor='var(--gray-200)'"/>
+          </div>
+          <span id="wr-applications-search-count" style="font-size:12px;color:var(--gray-400)"></span>
+        </div>
         <div id="wr-applications-list"></div>
       </div>
 
@@ -1134,6 +1141,15 @@
       <div id="wr-tab-letters" class="hidden">
         <div class="section-heading">Issued Letters — All Students</div>
         <p style="font-size:13px;color:var(--gray-600);margin-bottom:14px">View and download allotment letters, no dues certificates, and leave approval letters issued to students.</p>
+        <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="position:relative;flex:1;min-width:200px;max-width:380px">
+            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:14px;pointer-events:none">🔍</span>
+            <input id="wr-letters-search" type="text" placeholder="Search by name or roll number…"
+              style="width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:var(--transition)"
+              oninput="renderWardenLetters()" onfocus="this.style.borderColor='var(--navy-mid)'" onblur="this.style.borderColor='var(--gray-200)'"/>
+          </div>
+          <span id="wr-letters-search-count" style="font-size:12px;color:var(--gray-400)"></span>
+        </div>
         <div id="wr-letters-list"><p style="color:var(--gray-400);font-size:13px">Loading…</p></div>
       </div>
 
@@ -2470,11 +2486,9 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // Do NOT put warden ID/password in this file — it is public on GitHub.
 
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
-// On page load, fetch the backend version and:
-// 1. Log it to the console (F12 → Console)
-// 2. Display it in a visible banner on the Download Provisional Letter page
-// If the version doesn't say "v20.4", the new code hasn't been deployed yet.
-const EXPECTED_BACKEND_VERSION = 'v21.0';
+// Fetches the backend version on page load and displays a small status banner
+// on the Download Provisional Letter page. Helps verify the deployment is current.
+const EXPECTED_BACKEND_VERSION = 'v22.2';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -2485,40 +2499,27 @@ async function checkBackendVersion() {
     const res = await fetch(GAS_URL);
     const data = await res.json();
     _backendVersion = data.version || 'UNKNOWN';
-    console.log('%c[Backend Version] ' + _backendVersion,
-      'color:#1a3a7c;font-weight:bold;font-size:14px');
-    console.log('[Backend Version] Full response:', data);
 
-    // Update the visible banner on the download page
     const banner = document.getElementById('dl-backend-version-banner');
     if(banner) {
       if(_backendVersion === EXPECTED_BACKEND_VERSION) {
         banner.style.background = '#e8f5e9';
         banner.style.color = '#1b5e20';
-        banner.innerHTML = '✅ Backend updated (' + _backendVersion + ') — rejected applications can be edited.';
+        banner.innerHTML = '✅ System up to date (' + _backendVersion + ')';
       } else {
         banner.style.background = '#fde8e8';
         banner.style.color = '#c62828';
-        banner.innerHTML = '⚠️ <strong>BACKEND NOT UPDATED!</strong> Current: ' + _backendVersion +
-          ' (expected ' + EXPECTED_BACKEND_VERSION + '). Rejected applications will show "Incorrect Access Key" until you deploy the new Apps Script code. ' +
-          'See DEPLOYMENT_CHECKLIST.md for instructions.';
+        banner.innerHTML = '⚠️ Backend needs update: current ' + _backendVersion + ', expected ' + EXPECTED_BACKEND_VERSION + '. Please deploy a new version in Apps Script.';
       }
-    }
-
-    if(_backendVersion !== EXPECTED_BACKEND_VERSION) {
-      console.error('%c⚠ BACKEND NOT UPDATED! Expected ' + EXPECTED_BACKEND_VERSION + ' but got ' + _backendVersion +
-        '. Please deploy a new version in Google Apps Script.',
-        'color:red;font-weight:bold;font-size:14px');
     }
     return _backendVersion;
   } catch(e) {
-    console.error('[Backend Version] Could not fetch version:', e.message);
     _backendVersion = 'ERROR';
     const banner = document.getElementById('dl-backend-version-banner');
     if(banner) {
       banner.style.background = '#fff3cd';
       banner.style.color = '#856404';
-      banner.innerHTML = '⚠️ Could not check backend version: ' + e.message;
+      banner.innerHTML = 'Could not verify backend version.';
     }
     return _backendVersion;
   }
@@ -2557,7 +2558,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate admission session dropdown dynamically (auto-generates future sessions)
   populateAdmissionSessionDropdown();
   // Warden fine date default
-  document.getElementById('wr-fine-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('wr-fine-date').value = todayYMD();
   updateRollPreview();
   // Auto-format text inputs to standard case
   applyInputFormatting();
@@ -2675,6 +2676,22 @@ function fmtDMY(raw) {
   }
   // Fallback
   return s.split('T')[0] || s;
+}
+
+// ── LOCAL DATE HELPERS (timezone-safe) ───────────────────────────────────────
+// Returns today's date (or a Date object's date) as YYYY-MM-DD using LOCAL
+// timezone components — NOT UTC. This prevents the one-day-behind bug that
+// occurs when using .toISOString() in non-UTC timezones (e.g. IST = UTC+5:30).
+function fmtYMD(dateObj) {
+  const d = dateObj || new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
+// Returns today's date as YYYY-MM-DD (local timezone)
+function todayYMD() {
+  return fmtYMD(new Date());
 }
 
 // TOAST
@@ -3837,7 +3854,7 @@ function isSemesterLocked(student) {
     const feePaid = payments.find(p => p.paymentType === 'semesterFee'
       && String(p.semester) === String(due.semester) && p.status === 'approved');
     if(!feePaid && due.deadline) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = todayYMD();
       if(todayStr > due.deadline) return true;  // past deadline — lock
     }
   }
@@ -3845,7 +3862,7 @@ function isSemesterLocked(student) {
   // PATH C: Student is in 'pending' status (payment submitted but not yet verified by Admin)
   // and a feeDueDate is set on the student record — lock after that date.
   if(student.status === 'pending' && student.feeDueDate) {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = todayYMD();
     if(todayStr > student.feeDueDate) return true;
   }
 
@@ -3926,7 +3943,7 @@ function renderSemLockNotice(s) {
       && String(q.semester) === String(p.semester) && q.status === 'approved');
     if(feePaid) return false;
     if(!p.deadline) return false;
-    return new Date().toISOString().split('T')[0] > p.deadline;
+    return todayYMD() > p.deadline;
   });
   const deadline = overdueDue ? overdueDue.deadline : (s.feeDueDate || '—');
   const semLockLabel = overdueDue ? semLabel(overdueDue.semester) : 'current session';
@@ -4806,7 +4823,7 @@ function renderPaymentActions(s) {
           </div>
           <div class="field" style="margin:0">
             <label>Date of Payment <span class="req">*</span></label>
-            <input type="date" id="cp-date" max="${new Date().toISOString().split('T')[0]}"/>
+            <input type="date" id="cp-date" max="${todayYMD()}"/>
             <div class="err-msg hidden" id="err-cp-date"></div>
           </div>
         </div>
@@ -4845,7 +4862,7 @@ function renderPaymentActions(s) {
 
   // Pre-fill today's date
   const dateEl = document.getElementById('cp-date');
-  if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  if(dateEl && !dateEl.value) dateEl.value = todayYMD();
 }
 
 // ── Keep these stubs so any stray onclick references don't crash ──────────────
@@ -5014,14 +5031,14 @@ async function initNewSemester() {
                 || (()=>{
                      const s = document.getElementById('dw-newsemester-start')?.value.trim();
                      if(!s) return '';
-                     return new Date(new Date(s).getTime()+10*86400000).toISOString().split('T')[0];
+                     return fmtYMD(new Date(new Date(s).getTime()+10*86400000));
                    })();
   const resultEl = document.getElementById('sem-init-result');
 
   if(!semester) { if(resultEl) resultEl.innerHTML='<div class="alert alert-danger">Please select a semester number.</div>'; return; }
   if(!deadline) { if(resultEl) resultEl.innerHTML='<div class="alert alert-danger">Please set a session start date in Panel 3.</div>'; return; }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayYMD();
   if(deadline <= todayStr) {
     if(resultEl) resultEl.innerHTML='<div class="alert alert-danger">Deadline must be a future date.</div>';
     return;
@@ -5296,11 +5313,21 @@ function renderWardenStats() {
 }
 
 function renderApplicationsList() {
-  const newPending  = wrStudents.filter(s=>s.status==='new_pending');
-  const provisional = wrStudents.filter(s=>s.status==='provisional');
-  const pending     = wrStudents.filter(s=>s.status==='pending');
-  const rejected    = wrStudents.filter(s=>s.status==='rejected');
+  // Read the search query (if any)
+  const q = (document.getElementById('wr-applications-search')?.value||'').toLowerCase().trim();
+  const matchFn = s => !q ||
+    (s.name||'').toLowerCase().includes(q) ||
+    (s.rollFull||'').toLowerCase().includes(q);
+
+  const newPending  = wrStudents.filter(s=>s.status==='new_pending' && matchFn(s));
+  const provisional = wrStudents.filter(s=>s.status==='provisional' && matchFn(s));
+  const pending     = wrStudents.filter(s=>s.status==='pending' && matchFn(s));
+  const rejected    = wrStudents.filter(s=>s.status==='rejected' && matchFn(s));
   const list = document.getElementById('wr-applications-list');
+  if(!list) return;
+  const countEl = document.getElementById('wr-applications-search-count');
+  const total = newPending.length + provisional.length + pending.length + rejected.length;
+  if(countEl) countEl.textContent = q ? `${total} result${total!==1?'s':''} found` : '';
 
   // Row for NEW STUDENT (provisional approval needed)
   const makeNewStudentRow = s => `<div class="student-row" style="align-items:flex-start">
@@ -5424,7 +5451,15 @@ function renderApplicationsList() {
     out += `<div class="section-heading" style="margin-top:16px;color:var(--danger)">Rejected (${rejected.length})</div>`;
     out += rejected.map(makeRejectedRow).join('');
   }
+  if(!out && q) {
+    out = '<p style="color:var(--gray-400);font-size:13px;padding:8px 0">No applications found matching your search.</p>';
+  }
   list.innerHTML = out;
+}
+
+// Wrapper for the search input on the Applications tab
+function wrFilterApplications() {
+  renderApplicationsList();
 }
 
 
@@ -5703,7 +5738,7 @@ async function openApprove(rollFull, viewOnly=false) {
     // BUG FIX: The payment deadline defaults to 5 days from today (auto-calculated),
     // but the warden CAN manually override it if needed. The input is pre-filled
     // with the 5-day default so the warden can either accept it as-is or change it.
-    const _autoDeadline = new Date(Date.now() + 5*24*60*60*1000).toISOString().slice(0,10);
+    const _autoDeadline = fmtYMD(new Date(Date.now() + 5*24*60*60*1000));
     const _autoDeadlineDisplay = new Date(Date.now() + 5*24*60*60*1000).toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
 
     dueDateDiv.innerHTML = `
@@ -5717,7 +5752,7 @@ async function openApprove(rollFull, viewOnly=false) {
       </div>
       <div class="field">
         <label>Fee Payment Due Date <span class="req">*</span></label>
-        <input type="date" id="wr-prov-due-date" value="${_autoDeadline}" min="${new Date().toISOString().split('T')[0]}"/>
+        <input type="date" id="wr-prov-due-date" value="${_autoDeadline}" min="${todayYMD()}"/>
         <div class="hint" id="wr-prov-due-hint" style="margin-top:5px">
           <span style="color:var(--success);font-weight:600">✅ Auto-filled: 5 days from today (${_autoDeadlineDisplay}).</span>
           <span style="color:var(--gray-600)">You may change this date if needed.</span><br/>
@@ -5860,8 +5895,10 @@ async function openApprove(rollFull, viewOnly=false) {
   }
   // Drive document links
   const driveLinks = getDriveLinks(s);
-  // Show drive document links + regen button if provisional letter is missing
-  const showRegenBtn = (isProvisional || s.status === 'pending') && !driveLinks.provisionalLetter;
+  // BUG FIX: Always show the regen button for provisional/pending students so the
+  // warden can re-generate the letter AND change the payment deadline. Previously
+  // the button was only shown when the letter was missing.
+  const showRegenBtn = (isProvisional || s.status === 'pending');
   if(driveLinks.provisionalLetter || driveLinks.allotmentLetter || driveLinks.noDuesCert || showRegenBtn) {
     let linksHtml = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">';
     if(driveLinks.provisionalLetter) linksHtml += `<a href="${driveLinks.provisionalLetter}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📋 Provisional Letter</a>`;
@@ -6222,7 +6259,7 @@ function _dwStatusBadge(badgeId, statusText, color) {
 
 function _dwWindowStatus(start, end) {
   // returns {label, color, msg}
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayYMD();
   if(!start && !end) return { label:'Always Open', color:'open', msg:'✓ No date restriction — always open.' };
   if(start && !end) {
     if(today < start) return { label:'Upcoming', color:'upcoming', msg:`⏳ Opens on ${start}` };
@@ -6306,8 +6343,8 @@ async function loadDateWindows() {
 
   // ── Panel 4: Registered Fee Deadline (auto from panel 3 +10 days) ────────
   if(p3.start) {
-    const deadline = new Date(new Date(p3.start).getTime() + 10*86400000).toISOString().slice(0,10);
-    const today = new Date().toISOString().slice(0,10);
+    const deadline = fmtYMD(new Date(new Date(p3.start).getTime() + 10*86400000));
+    const today = todayYMD();
     const overDays = today > deadline ? Math.floor((new Date(today)-new Date(deadline))/86400000) : 0;
     const overFine = Math.min(overDays*50, 500);
     const daysLeft = deadline >= today ? Math.ceil((new Date(deadline)-new Date())/86400000) : 0;
@@ -6342,7 +6379,7 @@ function _renderProvisionalDeadlines(students) {
     el.innerHTML = '<div style="font-size:12px;color:var(--gray-400);font-style:italic">No provisional students with active deadlines.</div>';
     return;
   }
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayYMD();
   let html = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr style="background:var(--gray-50);border-bottom:1px solid var(--gray-200)">
       <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Roll No.</th>
@@ -8211,20 +8248,32 @@ async function renderWardenLetters() {
   if(!list) return;
   list.innerHTML = '<p style="color:var(--gray-400);font-size:13px"><span class="spinner spinner-dark"></span> Loading…</p>';
 
+  // Read the search query (if any)
+  const q = (document.getElementById('wr-letters-search')?.value||'').toLowerCase().trim();
+  const matchFnStudent = s => !q ||
+    (s.name||'').toLowerCase().includes(q) ||
+    (s.rollFull||'').toLowerCase().includes(q);
+  const matchFnLeave = l => !q ||
+    (l.studentName||'').toLowerCase().includes(q) ||
+    (l.rollFull||'').toLowerCase().includes(q);
+  const countEl = document.getElementById('wr-letters-search-count');
+
   // Build letters list from wrStudents (allotment + no dues) plus leaves
   let html = '';
+  let totalCount = 0;
 
   // -- Allotment & No Dues letters (defined first to avoid ReferenceError below) --
   const studentsWithDocs = wrStudents.filter(s => {
     const dl = getDriveLinks(s);
-    return dl.allotmentLetter || dl.noDuesCert;
+    return (dl.allotmentLetter || dl.noDuesCert) && matchFnStudent(s);
   });
 
   // -- Provisional Allotment Letters --
   const studentsWithProvisional = wrStudents.filter(s => {
     const dl = getDriveLinks(s);
-    return dl.provisionalLetter;
+    return dl.provisionalLetter && matchFnStudent(s);
   });
+  totalCount += studentsWithProvisional.length + studentsWithDocs.length;
   if(studentsWithProvisional.length) {
     html += `<div class="section-heading" style="margin-top:${studentsWithDocs.length?'20px':'0'}">📋 Provisional Hostel Allotment Letters</div>`;
     html += studentsWithProvisional.map(s => {
@@ -8262,14 +8311,15 @@ async function renderWardenLetters() {
         <div style="display:flex;gap:6px;flex-wrap:wrap">${btns}</div>
       </div>`;
     }).join('');
-  } else {
+  } else if(!q) {
     html += `<div class="alert alert-info" style="margin-bottom:16px">No allotment letters or no dues certificates issued yet.</div>`;
   }
 
   // -- Leave approval letters --
   const lr = await callBackend('getAllLeaves');
   if(lr.success) {
-    const approvedLeaves = (lr.leaves||[]).filter(l=>l.status==='approved'&&l.driveUrl);
+    const approvedLeaves = (lr.leaves||[]).filter(l=>l.status==='approved'&&l.driveUrl&&matchFnLeave(l));
+    totalCount += approvedLeaves.length;
     if(approvedLeaves.length) {
       html += `<div class="section-heading" style="margin-top:20px">Leave Approval Letters</div>`;
       html += approvedLeaves.slice().reverse().map(l=>`
@@ -8280,11 +8330,16 @@ async function renderWardenLetters() {
           </div>
           <a href="${l.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Leave Letter</a>
         </div>`).join('');
-    } else {
+    } else if(!q) {
       html += `<div class="alert alert-info" style="margin-top:12px">No approved leave letters issued yet.</div>`;
     }
   }
 
+  if(countEl) countEl.textContent = q ? `${totalCount} result${totalCount!==1?'s':''} found` : '';
+
+  if(!html && q) {
+    html = '<p style="color:var(--gray-400);font-size:13px;padding:8px 0">No letters found matching your search.</p>';
+  }
   list.innerHTML = html || '<p style="color:var(--gray-400);font-size:13px">No issued letters found.</p>';
 }
 
@@ -8319,7 +8374,7 @@ async function loadWardenLeaves() {
     const btnId = 'lv-btn-' + l.leaveId.replace(/[^a-zA-Z0-9]/g, '_');
     const actions=showActions?`
       <div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn btn-success btn-sm" id="${btnId}-approve" onclick="decideLeave('${l.leaveId}','approved',this)" style="font-size:11px">✓ Approve</button>
+        <button class="btn btn-success btn-sm" id="${btnId}-approve" onclick="decideLeave('${l.leaveId}','approved','',this)" style="font-size:11px">✓ Approve</button>
         <button class="btn btn-danger btn-sm" id="${btnId}-reject" onclick="promptRejectLeave('${l.leaveId}',this)" style="font-size:11px">✗ Reject</button>
       </div>`:'';
     const dlBtn = l.status==='approved'
@@ -8358,16 +8413,9 @@ async function loadWardenLeaves() {
 }
 
 async function decideLeave(leaveId, decision, reason, btnEl) {
-  // BUG FIX (leave reject "not working"): added loading indicator on the
-  // clicked button so the warden gets visual feedback while the backend
-  // call is in flight. Also added comprehensive error handling with
-  // console logging so any failure is visible in the browser console.
   // The button element is passed explicitly as `btnEl` (from `this` in the
   // onclick handler) so we don't rely on the global `event` variable.
-  console.log('[decideLeave] called:', {leaveId, decision, reason: (reason||'').slice(0,80)});
-
   let clickedBtn = btnEl || null;
-  // Fallback: try to find the button from the global event (older browsers)
   if(!clickedBtn && typeof event !== 'undefined' && event && event.target) {
     try { clickedBtn = event.target.closest('button'); } catch(_) {}
   }
@@ -8380,7 +8428,6 @@ async function decideLeave(leaveId, decision, reason, btnEl) {
 
   try {
     const r = await callBackend('decideLeave', {leaveId, decision, reason: reason || ''});
-    console.log('[decideLeave] backend response:', r);
 
     if(r.success) {
       toast(decision==='approved'
@@ -8389,14 +8436,11 @@ async function decideLeave(leaveId, decision, reason, btnEl) {
         'success');
       await loadWardenLeaves();
     } else {
-      console.error('[decideLeave] backend returned error:', r.error);
       toast('Failed: ' + (r.error || 'Unknown error'), 'error');
     }
   } catch(e) {
-    console.error('[decideLeave] exception:', e);
     toast('Error: ' + (e.message || 'Unknown error'), 'error');
   } finally {
-    // Re-enable the button
     if(clickedBtn) {
       clickedBtn.disabled = false;
       if(clickedBtn.dataset.originalHtml) {
@@ -8483,16 +8527,9 @@ async function runBulkApproveLeaves() {
   await loadWardenLeaves();
 }
 function promptRejectLeave(leaveId, btnEl) {
-  // BUG FIX (leave reject "not working"): The previous implementation used a
-  // custom modal (openReasonModal → reason-modal → submitReasonModal) which
-  // was failing to open for some wardens — clicking Reject did nothing visible.
-  // Root cause was difficult to reproduce (likely a DOM/CSS/JS-error interaction
-  // specific to the deployed environment), so we now use the browser's native
-  // window.prompt() dialog which CANNOT be broken by CSS, DOM, or JS issues.
-  // This guarantees the warden can always reject a leave.
-  console.log('[promptRejectLeave] called for leaveId:', leaveId);
+  // Uses the browser's native window.prompt() dialog — 100% reliable across
+  // all browsers and cannot be broken by CSS/DOM/JS issues.
   if(!leaveId) {
-    console.error('[promptRejectLeave] no leaveId provided!');
     toast('Error: could not identify the leave application.', 'error');
     return;
   }
@@ -8506,10 +8543,7 @@ function promptRejectLeave(leaveId, btnEl) {
   );
 
   // User clicked Cancel or closed the dialog
-  if(reason === null) {
-    console.log('[promptRejectLeave] user cancelled the rejection');
-    return;
-  }
+  if(reason === null) return;
 
   const trimmedReason = reason.trim();
   if(!trimmedReason) {
@@ -8518,7 +8552,6 @@ function promptRejectLeave(leaveId, btnEl) {
   }
 
   // Call decideLeave with the rejection reason and the button element
-  console.log('[promptRejectLeave] proceeding with reason:', trimmedReason.slice(0, 80));
   decideLeave(leaveId, 'rejected', trimmedReason, btnEl);
 }
 
@@ -10057,7 +10090,7 @@ function openResubmitModal(paymentIndex) {
   document.getElementById('err-resubmit-receipt').classList.add('hidden');
   document.getElementById('err-resubmit-img').classList.add('hidden');
   // Pre-fill today's date and set max to today
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayYMD();
   const rdateEl = document.getElementById('resubmit-date');
   if(rdateEl) { rdateEl.value = todayStr; rdateEl.max = todayStr; }
   delete uploadedB64['resubmit-img'];
@@ -10239,8 +10272,6 @@ function dlReset() {
   clearErr('dl-email');
   clearErr('dl-access-key');
   clearErr('dl-verify');
-  const debugAlert = document.getElementById('dl-debug-alert');
-  if(debugAlert) debugAlert.classList.add('hidden');
   const verify = document.getElementById('dl-step-verify');
   const result = document.getElementById('dl-step-result');
   if(verify) verify.classList.remove('hidden');
@@ -10249,9 +10280,6 @@ function dlReset() {
 
 async function verifyAndDownload() {
   clearErr('dl-email'); clearErr('dl-access-key'); clearErr('dl-verify');
-  // Clear the debug alert
-  const debugAlert = document.getElementById('dl-debug-alert');
-  if(debugAlert) debugAlert.classList.add('hidden');
 
   const email = (document.getElementById('dl-email')?.value || '').trim().toLowerCase();
   const key   = (document.getElementById('dl-access-key')?.value || '').trim();
@@ -10267,33 +10295,23 @@ async function verifyAndDownload() {
 
   const r = await callBackend('getProvisionalLetter', { email: email, accessKey: key });
 
-  // DEBUG: log the full backend response to the console so we can see exactly
-  // what the backend returned. Open F12 → Console to view.
-  console.log('%c[verifyAndDownload] Backend response:', 'color:#1a3a7c;font-weight:bold', r);
-
   btn.disabled = false;
   btn.innerHTML = '🔍 Verify &amp; Get Letter';
 
   const resultDiv = document.getElementById('dl-result-content');
 
   if(!r.success) {
-    // Show error inline — keep form visible so user can retry
-    console.log('[verifyAndDownload] Error:', r.error);
     showErr('dl-verify', r.error || 'Verification failed. Please check and try again.');
     document.getElementById('err-dl-verify').classList.remove('hidden');
     return;
   }
 
   // ─── REJECTED APPLICATION: show rejection reason + edit button ───────────
-  // BUG FIX: Previously, rejected applications got a generic error message.
-  // Now the backend returns the full rejection reason + student data, so the
-  // student can edit and re-submit directly from this public page (no login
-  // required — rejected students cannot register on the Student Portal).
-  console.log('[verifyAndDownload] Status:', r.status);
+  // The backend returns the full rejection reason + student data, so the
+  // student can edit and re-submit directly from this public page.
   if(r.status === 'rejected') {
     // Set csStudent so editRejectedAdmission() can pre-fill the form
     csStudent = r.student;
-    console.log('[verifyAndDownload] Rejected application — showing edit form. csStudent set:', csStudent);
     // _editingFromPublicPage is determined inside editRejectedAdmission()
     // based on the current section (download-letter), so no need to set it here.
 
@@ -10395,20 +10413,113 @@ async function verifyAndDownload() {
 }
 
 // ── RE-GENERATE PROVISIONAL LETTER (warden) ─────────────────────────────────────
+// BUG FIX: The warden can now change the payment deadline when re-generating the
+// provisional letter. A prompt asks for the new deadline (defaulting to the
+// current stored deadline or 5 days from today). The new deadline is sent to the
+// backend, which updates the PDF and the stored provisionalPaymentDeadline.
 async function regenProvisionalLetter(rollFull, btn) {
-  if(!confirm('Re-generate the Provisional Allotment Letter for ' + rollFull + '?\nThe Drive file will be overwritten with a fresh copy.')) return;
-  const origText = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner spinner-dark"></span> Generating…';
-  const r = await callBackend('regenProvisionalLetter', { rollFull });
-  btn.disabled = false;
-  btn.innerHTML = origText;
-  if(r.success) {
-    toast('✅ Provisional letter re-generated. Refreshing…','success');
-    setTimeout(() => openApprove(rollFull, true), 1500);
-  } else {
-    toast('❌ ' + (r.error || 'Failed to re-generate letter.'),'error');
-  }
+  // Find the student's current deadline (if any)
+  const s = wrStudents.find(x => x.rollFull === rollFull);
+  const dl = s ? getDriveLinks(s) : {};
+  const currentDeadline = dl.provisionalPaymentDeadline || '';
+  const defaultDeadline = currentDeadline || fmtYMD(new Date(Date.now() + 5*24*60*60*1000));
+
+  // Build a modal for the warden to confirm + set a new deadline
+  const overlay = document.createElement('div');
+  overlay.id = 'regen-prov-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,39,68,.55);z-index:9300;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0;font-size:17px;color:var(--navy)">🔄 Re-generate Provisional Letter</h3>
+        <button onclick="document.getElementById('regen-prov-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+      </div>
+      <div style="font-size:13px;color:var(--gray-600);margin-bottom:14px">
+        Re-generating will overwrite the existing Provisional Allotment Letter PDF in Drive.
+        You can also update the payment deadline below.
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Payment Due Date <span class="req">*</span></label>
+        <input type="date" id="regen-prov-deadline" value="${defaultDeadline}" min="${todayYMD()}"
+          style="width:100%;padding:9px 11px;border:1.5px solid var(--gray-200);border-radius:7px;font-size:14px;box-sizing:border-box"/>
+        <div style="font-size:11px;color:var(--gray-500);margin-top:4px">
+          ${currentDeadline ? 'Current deadline: ' + currentDeadline + '. ' : ''}Change if needed. Late fine ₹50/day (max ₹500) applies after this date.
+        </div>
+      </div>
+      <div id="regen-prov-err" style="color:#c0392b;font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('regen-prov-overlay').remove()" class="btn btn-secondary btn-sm">Cancel</button>
+        <button id="regen-prov-confirm" class="btn btn-primary btn-sm">🔄 Re-generate Letter</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('regen-prov-deadline')?.focus(), 80);
+
+  // Handle Enter key on the date input
+  document.getElementById('regen-prov-deadline').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') document.getElementById('regen-prov-confirm').click();
+  });
+
+  // Wait for the warden to click confirm (using a Promise)
+  return new Promise((resolve) => {
+    document.getElementById('regen-prov-confirm').addEventListener('click', async () => {
+      const newDeadline = document.getElementById('regen-prov-deadline').value;
+      const errEl = document.getElementById('regen-prov-err');
+
+      if(!newDeadline) {
+        errEl.textContent = 'Please set a payment due date.';
+        errEl.style.display = '';
+        return;
+      }
+      errEl.style.display = 'none';
+
+      // Format for display (DD Month YYYY)
+      const dp = newDeadline.split('-');
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const dueDateDisplay = dp[2] + ' ' + months[parseInt(dp[1])-1] + ' ' + dp[0];
+
+      // Disable button + show spinner
+      const confirmBtn = document.getElementById('regen-prov-confirm');
+      const cancelBtn = overlay.querySelector('.btn-secondary');
+      confirmBtn.disabled = true;
+      cancelBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="spinner spinner-dark"></span> Generating…';
+
+      try {
+        const r = await callBackend('regenProvisionalLetter', {
+          rollFull,
+          dueDate: dueDateDisplay,
+          dueDateISO: newDeadline
+        });
+
+        if(r.success) {
+          toast('✅ Provisional letter re-generated with deadline ' + dueDateDisplay + '. Refreshing…', 'success');
+          overlay.remove();
+          // Update the in-memory student data
+          if(s) {
+            let dlUpdated = getDriveLinks(s);
+            dlUpdated.provisionalLetter = r.driveUrl;
+            dlUpdated.provisionalPaymentDeadline = newDeadline;
+            s.driveLinks = dlUpdated;
+          }
+          setTimeout(() => openApprove(rollFull, true), 1500);
+        } else {
+          errEl.textContent = r.error || 'Failed to re-generate letter.';
+          errEl.style.display = '';
+          confirmBtn.disabled = false;
+          cancelBtn.disabled = false;
+          confirmBtn.innerHTML = '🔄 Re-generate Letter';
+        }
+      } catch(e) {
+        errEl.textContent = 'Error: ' + (e.message || 'Unknown error');
+        errEl.style.display = '';
+        confirmBtn.disabled = false;
+        cancelBtn.disabled = false;
+        confirmBtn.innerHTML = '🔄 Re-generate Letter';
+      }
+      resolve();
+    });
+  });
 }
 
 // ── RE-GENERATE LEAVE PDF (warden) ──────────────────────────────────────────────
@@ -10618,7 +10729,7 @@ function generateDebarReport(format) {
   ws['!cols'] = headers.map((_,i) => ({wch: [6,14,22,10,10,28,14,14,30,14,10,24][i]||14}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Debarment Register');
-  XLSX.writeFile(wb, `Debarment_Register_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Debarment_Register_${todayYMD()}.xlsx`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -11539,7 +11650,7 @@ function generateOccupancyReport(format) {
   ]);
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
-  XLSX.writeFile(wb, `Occupancy_Report_${session.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Occupancy_Report_${session.replace(/\s+/g,'_')}_${todayYMD()}.xlsx`);
   toast('Occupancy report downloaded.', 'success');
 }
 
@@ -11608,7 +11719,7 @@ function generateLeaveReport(format) {
   wsSummary['!cols'] = [14,22,16,18,12].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Student Summary');
 
-  XLSX.writeFile(wb, `Leave_Report_${session.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Leave_Report_${session.replace(/\s+/g,'_')}_${todayYMD()}.xlsx`);
   toast('Leave report downloaded.', 'success');
 }
 
@@ -11791,7 +11902,7 @@ function generateFinesReport(format) {
   ws['!cols'] = headers.map((_,i) => ({wch:[6,14,22,10,8,18,22,12,14,18,14,22,14,8,18,14][i]||14}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Fines Register');
-  XLSX.writeFile(wb, `Fines_Register_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Fines_Register_${todayYMD()}.xlsx`);
   toast('Fines report downloaded.', 'success');
 }
 
@@ -11986,7 +12097,7 @@ function generateAlumniReport(format) {
   ws['!cols'] = headers.map((_,i)=>({wch:[6,14,22,12,10,8,16,16,10,16,16,14,18,14,14][i]||14}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Alumni List');
-  XLSX.writeFile(wb, `Alumni_List_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Alumni_List_${todayYMD()}.xlsx`);
   toast('Alumni report downloaded.', 'success');
 }
 
