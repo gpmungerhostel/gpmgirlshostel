@@ -382,7 +382,7 @@
       <div class="file-zone" id="zone-photo" onclick="document.getElementById('file-photo').click()">
         <div class="file-icon" id="icon-photo">📷</div>
         <div class="file-info">
-          <p id="fname-photo">Click to upload photo</p>
+          <p id="fname-photo">Click to upload passport size photo</p>
           <small id="fsize-photo">50 KB – 200 KB allowed</small>
         </div>
       </div>
@@ -2493,7 +2493,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v23.2';
+const EXPECTED_BACKEND_VERSION = 'v24.0';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -2551,7 +2551,18 @@ let wrStudents = [];
 let wrCurrentApproveRoll = null;
 let wrDataLoaded = false;           // cache flag — prevent redundant full reload
 const uploadedFiles = {};   // key → File object
-const uploadedB64   = {};   // key → base64 string
+const uploadedB64   = {};   // key → base64 string (lazily populated on submit)
+const uploadedUrls  = {};   // key → object URL for instant preview (no base64)
+
+// Convert a File to base64 (only called when submitting — not during preview)
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => resolve(ev.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // ══════════════════════════════════════════════════════════
 // INIT
@@ -2599,6 +2610,13 @@ function _renderSection(name) {
   currentSection = name;
 
   // ── Per-section refresh logic ──────────────────────────
+  // BUG FIX: When navigating to the new-student section, reset the form so
+  // the student always sees a fresh application (not leftover data from a
+  // previous submission or edit-rejected flow).
+  if(name === 'new-student' && !_editingRejectedAdmission) {
+    nsResetForm();
+  }
+
   if(name === 'download-letter') {
     dlReset();
     // Re-check the backend version whenever the user visits this page
@@ -2770,18 +2788,28 @@ async function callBackend(action, data={}) {
     toast("⚙️ Backend not configured — please set your Apps Script URL in GAS_URL","error");
     return {success:false, error:"GAS_URL not configured. Open the HTML file and replace YOUR_SCRIPT_ID with your deployed Apps Script Web App URL."};
   }
-  // Deduplicate: if the same action+data is already in-flight, wait for it
-  const key = action + JSON.stringify(data);
-  if(_inflightRequests.has(key)) {
+  // Deduplicate: if the same action+data is already in-flight, wait for it.
+  // BUG FIX: Skip deduplication for actions that include large payloads (base64 images)
+  // or that must always make a fresh call (newStudent, updateRejectedAdmission,
+  // submitConsolidatedPayment). These actions have huge JSON keys (due to base64
+  // photo/signature data) that make JSON.stringify extremely slow, and they must
+  // always get a fresh response from the server.
+  const SKIP_DEDUP = ['newStudent', 'updateRejectedAdmission', 'submitConsolidatedPayment', 'payFine'];
+  const useDedup = !SKIP_DEDUP.includes(action);
+  const key = useDedup ? (action + JSON.stringify(data)) : (action + '_' + Date.now());
+  if(useDedup && _inflightRequests.has(key)) {
     return _inflightRequests.get(key);
   }
   const promise = (async () => {
     try {
+      // BUG FIX: Build the JSON body once, outside the fetch call, so we can
+      // show a progress indicator if it takes long.
+      const body = JSON.stringify({action, ...data});
       const res = await fetch(GAS_URL, {
         method:"POST",
         mode:"cors",
         headers:{"Content-Type":"text/plain"},
-        body: JSON.stringify({action, ...data})
+        body: body
       });
       if(!res.ok) return {success:false, error:"Server error: HTTP "+res.status};
       const text = await res.text();
@@ -2794,10 +2822,10 @@ async function callBackend(action, data={}) {
         : e.message;
       return {success:false, error: msg};
     } finally {
-      _inflightRequests.delete(key);
+      if(useDedup) _inflightRequests.delete(key);
     }
   })();
-  _inflightRequests.set(key, promise);
+  if(useDedup) _inflightRequests.set(key, promise);
   return promise;
 }
 
@@ -2832,20 +2860,22 @@ function handleFile(key, minKB, maxKB) {
 
   uploadedFiles[key] = file;
 
+  // BUG FIX: Use URL.createObjectURL for instant preview (no base64 conversion).
+  // The base64 conversion happens lazily only when submitting to the backend.
+  const objUrl = URL.createObjectURL(file);
+  if(!uploadedUrls) uploadedUrls = {};
+  // Revoke previous URL if exists
+  if(uploadedUrls[key]) URL.revokeObjectURL(uploadedUrls[key]);
+  uploadedUrls[key] = objUrl;
+
   // Preview — always replace previous preview image
-  const reader = new FileReader();
-  reader.onload = ev => {
-    uploadedB64[key] = ev.target.result.split(',')[1];
-    // Find existing preview img or original icon element and replace/update it
-    const existingImg = zone.querySelector('img.file-preview');
-    if(existingImg) {
-      existingImg.src = ev.target.result; // update in place
-    } else {
-      const currentIcon = document.getElementById('icon-'+key);
-      if(currentIcon) { const img = document.createElement('img'); img.src=ev.target.result; img.className='file-preview'; img.id='icon-'+key; currentIcon.replaceWith(img); }
-    }
-  };
-  reader.readAsDataURL(file);
+  const existingImg = zone.querySelector('img.file-preview');
+  if(existingImg) {
+    existingImg.src = objUrl; // update in place — instant, no base64
+  } else {
+    const currentIcon = document.getElementById('icon-'+key);
+    if(currentIcon) { const img = document.createElement('img'); img.src=objUrl; img.className='file-preview'; img.id='icon-'+key; currentIcon.replaceWith(img); }
+  }
 
   if(fname) fname.textContent = file.name;
   if(fsize) fsize.textContent = kb.toFixed(1)+' KB';
@@ -3039,8 +3069,8 @@ function nsShowPreview() {
   const pin = getVal('ns-pin');
   const address = getVal('ns-address');
   const session = (document.getElementById('ns-semester')?.value || '').trim();
-  const hasNewPhoto = !!uploadedB64['photo'];
-  const hasNewSig = !!uploadedB64['sig'];
+  const hasNewPhoto = !!uploadedFiles['photo'];
+  const hasNewSig = !!uploadedFiles['sig'];
   const accessKeyVal = document.getElementById('ns-access-key')?.value || '';
 
   // Format DOB for display
@@ -3051,10 +3081,10 @@ function nsShowPreview() {
     dobDisplay = dp[2] + ' ' + months[parseInt(dp[1])-1] + ' ' + dp[0];
   }
 
-  // Build photo preview HTML
+  // Build photo preview HTML — use object URL for instant display (no base64)
   let photoHtml;
-  if(hasNewPhoto) {
-    photoHtml = `<img src="data:image/jpeg;base64,${uploadedB64['photo']}" alt="Photo"
+  if(hasNewPhoto && uploadedUrls['photo']) {
+    photoHtml = `<img src="${uploadedUrls['photo']}" alt="Photo"
       style="max-width:100px;max-height:120px;object-fit:cover;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm)"/>`;
   } else if(_editingRejectedAdmission) {
     photoHtml = '<span style="color:var(--gray-500)">Existing photo on file (not changed)</span>';
@@ -3062,10 +3092,10 @@ function nsShowPreview() {
     photoHtml = '<span style="color:var(--danger)">Not uploaded</span>';
   }
 
-  // Build signature preview HTML
+  // Build signature preview HTML — use object URL for instant display (no base64)
   let sigHtml;
-  if(hasNewSig) {
-    sigHtml = `<img src="data:image/jpeg;base64,${uploadedB64['sig']}" alt="Signature"
+  if(hasNewSig && uploadedUrls['sig']) {
+    sigHtml = `<img src="${uploadedUrls['sig']}" alt="Signature"
       style="max-width:150px;max-height:60px;object-fit:contain;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff"/>`;
   } else if(_editingRejectedAdmission) {
     sigHtml = '<span style="color:var(--gray-500)">Existing signature on file (not changed)</span>';
@@ -3127,9 +3157,10 @@ function nsShowPreview() {
       <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Admission Session</td><td style="padding:8px 12px">${session}</td></tr>
       <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Access Key</td><td style="padding:8px 12px">${accessKeyHtml}</td></tr>
     </table>
+    <div class="err-msg hidden" id="ns-preview-error" style="margin-bottom:12px;font-size:13px;color:var(--danger);background:var(--danger-bg);padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--danger)"></div>
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="nsGo(2)">← Edit Details</button>
-      <button class="btn btn-gold" id="ns-submit-btn" onclick="nsDoSubmit()">${_editingRejectedAdmission ? 'Update Application & Re-submit' : 'Submit Application'}</button>
+      <button class="btn btn-gold" id="ns-preview-submit-btn" onclick="nsDoSubmit(this)">${_editingRejectedAdmission ? 'Update Application & Re-submit' : 'Submit Application'}</button>
     </div>`;
 
   // Hide all steps and show preview
@@ -3139,12 +3170,81 @@ function nsShowPreview() {
 }
 
 // Actual submission — called from the preview panel's Submit button
-async function nsDoSubmit() {
-  const btn = document.getElementById('ns-submit-btn');
-  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting…'; }
-  clearErr('ns-submit');
+// BUG FIX: The button element is passed as `btnEl` (from `this` in the onclick
+// handler) so we update the CORRECT button — not a hidden one with the same ID.
+let _nsSubmitting = false;
 
-  if(_editingRejectedAdmission) {
+// Show error on the preview panel (not the hidden Step 3 error div)
+function nsShowPreviewError(msg) {
+  // Show on the preview panel error div
+  const previewErr = document.getElementById('ns-preview-error');
+  if(previewErr) {
+    previewErr.textContent = msg;
+    previewErr.classList.remove('hidden');
+  }
+  // Also set the hidden Step 3 error div for backward compat
+  showErr('ns-submit', msg);
+}
+
+function nsClearPreviewError() {
+  const previewErr = document.getElementById('ns-preview-error');
+  if(previewErr) {
+    previewErr.textContent = '';
+    previewErr.classList.add('hidden');
+  }
+}
+
+async function nsDoSubmit(btnEl) {
+  // Prevent double-submission
+  if(_nsSubmitting) return;
+  _nsSubmitting = true;
+
+  const btn = btnEl || document.getElementById('ns-preview-submit-btn') || document.getElementById('ns-submit-btn');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Converting images…'; }
+  nsClearPreviewError();
+
+  // BUG FIX: Lazily convert uploaded files to base64 ONLY at submission time.
+  // This keeps the preview fast (uses object URLs) and only does the slow
+  // base64 conversion when the student actually clicks Submit.
+  try {
+    if(uploadedFiles['photo'] && !uploadedB64['photo']) {
+      if(btn) btn.innerHTML = '<span class="spinner"></span> Processing photo…';
+      uploadedB64['photo'] = await fileToBase64(uploadedFiles['photo']);
+    }
+    if(uploadedFiles['sig'] && !uploadedB64['sig']) {
+      if(btn) btn.innerHTML = '<span class="spinner"></span> Processing signature…';
+      uploadedB64['sig'] = await fileToBase64(uploadedFiles['sig']);
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.innerHTML = _editingRejectedAdmission ? 'Update Application & Re-submit' : 'Submit Application'; }
+    nsShowPreviewError('Error processing image files. Please re-upload your photo and signature.');
+    _nsSubmitting = false;
+    return;
+  }
+
+  if(btn) { btn.innerHTML = '<span class="spinner"></span> Submitting…'; }
+
+  // BUG FIX: Show a progress timer so the student knows the submission is still
+  // processing (GAS can take 20-60 seconds for newStudent due to Drive uploads).
+  let _progressSecs = 0;
+  const _progressTimer = setInterval(() => {
+    _progressSecs++;
+    if(btn && !_nsSubmitting) { clearInterval(_progressTimer); return; }
+    if(btn) {
+      if(_progressSecs < 10) {
+        btn.innerHTML = '<span class="spinner"></span> Submitting…';
+      } else if(_progressSecs < 30) {
+        btn.innerHTML = '<span class="spinner"></span> Uploading to Drive… (' + _progressSecs + 's)';
+      } else if(_progressSecs < 60) {
+        btn.innerHTML = '<span class="spinner"></span> Still processing… (' + _progressSecs + 's) — please wait';
+      } else {
+        btn.innerHTML = '<span class="spinner"></span> Taking longer than usual… (' + _progressSecs + 's)';
+      }
+    }
+  }, 1000);
+
+  try {
+    if(_editingRejectedAdmission) {
     // ── EDIT MODE: call updateRejectedAdmission ──────────────────────
     const payload = {
       rollFull: _editingRejectedRollFull,
@@ -3189,10 +3289,7 @@ async function nsDoSubmit() {
         if(rd && rd.success && rd.student) { csStudent = rd.student; }
       } catch(_) {}
     } else {
-      showErr('ns-submit', r.error || 'Update failed. Please try again.');
-      document.getElementById('err-ns-submit').classList.remove('hidden');
-      // Go back to preview
-      document.getElementById('ns-step-preview').classList.remove('hidden');
+      nsShowPreviewError(r.error || 'Update failed. Please try again.');
     }
   } else {
     // ── NEW APPLICATION MODE: call newStudent ────────────────────────
@@ -3237,10 +3334,18 @@ async function nsDoSubmit() {
       document.getElementById('ns-success').classList.remove('hidden');
       window.scrollTo({top:0,behavior:'smooth'});
     } else {
-      showErr('ns-submit', r.error || 'Submission failed. Please try again.');
-      document.getElementById('err-ns-submit').classList.remove('hidden');
-      document.getElementById('ns-step-preview').classList.remove('hidden');
+      nsShowPreviewError(r.error || 'Submission failed. Please try again.');
     }
+  }
+  } catch(e) {
+    // If any exception occurs, show error and re-enable the button
+    nsShowPreviewError('Error: ' + (e.message || 'Unknown error. Please try again.'));
+    if(btn) { btn.disabled = false; btn.innerHTML = _editingRejectedAdmission ? 'Update Application & Re-submit' : 'Submit Application'; }
+  } finally {
+    // Stop the progress timer
+    clearInterval(_progressTimer);
+    // Reset the submission guard — must always run, even if an exception was thrown
+    _nsSubmitting = false;
   }
 }
 
@@ -3264,7 +3369,7 @@ function nsValidate(step) {
     else clearErr('ns-roll');
     if(!getVal('ns-dob')) { showErr('ns-dob','Date of birth is required'); ok=false; } else clearErr('ns-dob');
     // In edit mode, photo is optional
-    if(!_editingRejectedAdmission && !uploadedB64['photo']) { showErr('photo','Student photo is required'); ok=false; } else clearErr('photo');
+    if(!_editingRejectedAdmission && !uploadedFiles['photo']) { showErr('photo','Student photo is required'); ok=false; } else clearErr('photo');
   }
   if(step === 1) {
     const c = getVal('ns-contact'), gc = getVal('ns-gcontact'), em = getVal('ns-email'), pin = getVal('ns-pin');
@@ -3277,7 +3382,7 @@ function nsValidate(step) {
   }
   if(step === 2) {
     // In edit mode, signature is optional
-    if(!_editingRejectedAdmission && !uploadedB64['sig']) { showErr('sig','Signature image is required'); ok=false; } else clearErr('sig');
+    if(!_editingRejectedAdmission && !uploadedFiles['sig']) { showErr('sig','Signature image is required'); ok=false; } else clearErr('sig');
     // Access Key
     const ak = document.getElementById('ns-access-key')?.value || '';
     const akc = document.getElementById('ns-access-key-confirm')?.value || '';
@@ -3364,12 +3469,18 @@ function editRejectedAdmission() {
   delete uploadedB64['sig'];
   delete uploadedFiles['photo'];
   delete uploadedFiles['sig'];
+  if(uploadedUrls) {
+    if(uploadedUrls['photo']) URL.revokeObjectURL(uploadedUrls['photo']);
+    if(uploadedUrls['sig']) URL.revokeObjectURL(uploadedUrls['sig']);
+    delete uploadedUrls['photo'];
+    delete uploadedUrls['sig'];
+  }
 
   // Reset the file-zone UI
   const photoZone = document.getElementById('zone-photo');
   const sigZone   = document.getElementById('zone-sig');
   if(photoZone) photoZone.innerHTML =
-    '<div class="file-icon" id="icon-photo">📷</div><div class="file-info"><p id="fname-photo">Current photo on file (click to replace)</p><small id="fsize-photo">50 KB – 200 KB</small></div>';
+    '<div class="file-icon" id="icon-photo">📷</div><div class="file-info"><p id="fname-photo">Current photo on file (click to replace with passport size photo)</p><small id="fsize-photo">50 KB – 200 KB</small></div>';
   if(sigZone) sigZone.innerHTML =
     '<div class="file-icon" id="icon-sig">✍️</div><div class="file-info"><p id="fname-sig">Current signature on file (click to replace)</p><small id="fsize-sig">20 KB – 100 KB</small></div>';
 
@@ -3513,8 +3624,106 @@ function nsSuccessBack() {
   if(csStudent && csStudent.rollFull) {
     returnToStudentProfile();
   } else {
+    // BUG FIX: Reset the entire new-student form so the student can submit
+    // a fresh application if they navigate back to "New Student Admission".
+    nsResetForm();
     showSection('home');
   }
+}
+
+// Reset all new-student form fields and state so a fresh application can be submitted
+function nsResetForm() {
+  // Clear all input fields
+  ['ns-name','ns-guardian','ns-roll-no','ns-roll-year','ns-dob',
+   'ns-contact','ns-gcontact','ns-email','ns-pin','ns-address',
+   'ns-access-key','ns-access-key-confirm','ns-semester'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+
+  // Reset selects to defaults — BUT keep session type and year
+  // (helps students see which session admission is open for)
+  const rollBranch = document.getElementById('ns-roll-branch');
+  if(rollBranch) rollBranch.value = 'CSE';
+  // DO NOT reset ns-sem-type and ns-sem-year — keep them so the student
+  // knows which session is currently active
+  const districtEl = document.getElementById('ns-district');
+  if(districtEl) districtEl.value = '';
+
+  // Clear all error messages
+  ['ns-name','ns-guardian','ns-roll','ns-dob','photo',
+   'ns-contact','ns-gcontact','ns-email','ns-pin','ns-semester',
+   'sig','ns-access-key','ns-access-key-confirm','ns-submit'].forEach(id => {
+    const el = document.getElementById('err-'+id);
+    if(el) el.classList.add('hidden');
+  });
+
+  // Clear uploaded files and URLs
+  delete uploadedB64['photo'];
+  delete uploadedB64['sig'];
+  delete uploadedFiles['photo'];
+  delete uploadedFiles['sig'];
+  if(uploadedUrls) {
+    if(uploadedUrls['photo']) URL.revokeObjectURL(uploadedUrls['photo']);
+    if(uploadedUrls['sig']) URL.revokeObjectURL(uploadedUrls['sig']);
+    delete uploadedUrls['photo'];
+    delete uploadedUrls['sig'];
+  }
+
+  // Reset file zone UI
+  const photoZone = document.getElementById('zone-photo');
+  if(photoZone) photoZone.innerHTML =
+    '<div class="file-icon" id="icon-photo">📷</div><div class="file-info"><p id="fname-photo">Click to upload passport size photo</p><small id="fsize-photo">50 KB – 200 KB allowed</small></div>';
+  const sigZone = document.getElementById('zone-sig');
+  if(sigZone) sigZone.innerHTML =
+    '<div class="file-icon" id="icon-sig">✍️</div><div class="file-info"><p id="fname-sig">Upload signature image</p><small id="fsize-sig">20 KB – 100 KB</small></div>';
+
+  // Reset access key hint
+  const akHintEl = document.querySelector('#ns-step-2 .hint');
+  if(akHintEl) akHintEl.textContent = '4–32 characters. You will use this to download your provisional letter.';
+
+  // Reset step 2 banner
+  const step2Banner = document.querySelector('#ns-step-2 .alert-info');
+  if(step2Banner) step2Banner.innerHTML = '<strong>📋 What happens next?</strong><br/>'+
+    'Your application will be sent directly to the Warden for review. Once approved, you will receive a '+
+    '<strong>Provisional Hostel Allotment Letter</strong> which you can download using your '+
+    'Roll Number + Access Key (set below). You do <strong>not</strong> need a portal account to download it. '+
+    'Fee payment is required after downloading the letter.';
+
+  // Reset submit button text
+  const submitBtn = document.getElementById('ns-submit-btn');
+  if(submitBtn) submitBtn.textContent = 'Submit Application';
+
+  // Reset success screen content
+  const successHeading = document.querySelector('#ns-success h2');
+  const successPara    = document.querySelector('#ns-success p');
+  const downloadHint   = document.getElementById('ns-success-download-hint');
+  if(successHeading) successHeading.textContent = 'Application Submitted!';
+  if(successPara) successPara.innerHTML = 'Your application has been sent to the Warden for provisional approval.<br/>'+
+    'Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>'+
+    '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
+    'Your registered Email + your Access Key</span>';
+  if(downloadHint) downloadHint.style.display = '';
+
+  // Hide success and preview screens
+  document.getElementById('ns-success').classList.add('hidden');
+  const previewEl = document.getElementById('ns-step-preview');
+  if(previewEl) previewEl.classList.add('hidden');
+
+  // Show step 0
+  for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.toggle('hidden', i!==0); }
+
+  // Reset edit-mode flags
+  _editingRejectedAdmission = false;
+  _editingRejectedRollFull  = null;
+  _nsSubmitting = false;
+
+  // Reset roll preview
+  updateRollPreview();
+  composeAdmissionSession();
+
+  // Clear csStudent (was set during edit-rejected flow)
+  if(csStudent && !csStudent.rollFull) csStudent = null;
 }
 
 // ══════════════════════════════════════════════════════════
