@@ -520,6 +520,11 @@
     </div>
   </div>
 
+  <!-- Preview Panel (shown before final submission) -->
+  <div id="ns-step-preview" class="card hidden">
+    <!-- Filled dynamically by nsShowPreview() -->
+  </div>
+
   <!-- Success -->
   <div id="ns-success" class="card hidden">
     <div class="success-screen">
@@ -2488,7 +2493,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v22.2';
+const EXPECTED_BACKEND_VERSION = 'v23.2';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -3004,19 +3009,242 @@ function getRollFull(noId, brId, yrId) {
 }
 
 // ══════════════════════════════════════════════════════════
-// NEW STUDENT — STEPS
+// NEW STUDENT — STEPS (nsGo, nsNext, nsValidate, nsSubmit are defined later
+// in the PREVIEW PANEL + SUBMIT section, which includes edit-mode support)
 // ══════════════════════════════════════════════════════════
-function nsGo(step) {
-  for(let i=0;i<3;i++) { const el=document.getElementById('ns-step-'+i); if(el) el.classList.toggle('hidden', i!==step); }
-  nsStep = step;
+
+// ══════════════════════════════════════════════════════════
+// PREVIEW PANEL + SUBMIT (unified for new + edit-rejected modes)
+// ══════════════════════════════════════════════════════════
+
+// Show the preview panel before final submission
+function nsShowPreview() {
+  if(!nsValidate(2)) return;
+  const _semCheck = (document.getElementById('ns-semester')?.value || '').trim();
+  if(!_semCheck) {
+    nsGo(1);
+    showErr('ns-semester','Please select your admission session');
+    return;
+  }
+
+  // Gather all values for display
+  const rollFull = _editingRejectedAdmission ? _editingRejectedRollFull : getRollFull('ns-roll-no','ns-roll-branch','ns-roll-year');
+  const name = getVal('ns-name');
+  const guardian = getVal('ns-guardian');
+  const dob = getVal('ns-dob');
+  const contact = getVal('ns-contact');
+  const gcontact = getVal('ns-gcontact');
+  const email = getVal('ns-email').toLowerCase();
+  const district = document.getElementById('ns-district')?.value || '';
+  const pin = getVal('ns-pin');
+  const address = getVal('ns-address');
+  const session = (document.getElementById('ns-semester')?.value || '').trim();
+  const hasNewPhoto = !!uploadedB64['photo'];
+  const hasNewSig = !!uploadedB64['sig'];
+  const accessKeyVal = document.getElementById('ns-access-key')?.value || '';
+
+  // Format DOB for display
+  let dobDisplay = dob;
+  if(dob) {
+    const dp = dob.split('-');
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    dobDisplay = dp[2] + ' ' + months[parseInt(dp[1])-1] + ' ' + dp[0];
+  }
+
+  // Build photo preview HTML
+  let photoHtml;
+  if(hasNewPhoto) {
+    photoHtml = `<img src="data:image/jpeg;base64,${uploadedB64['photo']}" alt="Photo"
+      style="max-width:100px;max-height:120px;object-fit:cover;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm)"/>`;
+  } else if(_editingRejectedAdmission) {
+    photoHtml = '<span style="color:var(--gray-500)">Existing photo on file (not changed)</span>';
+  } else {
+    photoHtml = '<span style="color:var(--danger)">Not uploaded</span>';
+  }
+
+  // Build signature preview HTML
+  let sigHtml;
+  if(hasNewSig) {
+    sigHtml = `<img src="data:image/jpeg;base64,${uploadedB64['sig']}" alt="Signature"
+      style="max-width:150px;max-height:60px;object-fit:contain;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);background:#fff"/>`;
+  } else if(_editingRejectedAdmission) {
+    sigHtml = '<span style="color:var(--gray-500)">Existing signature on file (not changed)</span>';
+  } else {
+    sigHtml = '<span style="color:var(--danger)">Not uploaded</span>';
+  }
+
+  // Build access key preview HTML
+  let accessKeyHtml;
+  if(accessKeyVal) {
+    // Mask the access key — show first 1 and last 1 character, mask the rest
+    const masked = accessKeyVal.length <= 2
+      ? '*'.repeat(accessKeyVal.length)
+      : accessKeyVal[0] + '*'.repeat(accessKeyVal.length - 2) + accessKeyVal[accessKeyVal.length-1];
+    accessKeyHtml = `<span style="font-family:monospace;font-size:14px;font-weight:600;color:var(--success);background:var(--success-bg);padding:3px 10px;border-radius:var(--radius-sm)">${masked}</span>
+      <span style="font-size:11px;color:var(--gray-500);margin-left:6px">(${accessKeyVal.length} characters)</span>`;
+  } else if(_editingRejectedAdmission) {
+    accessKeyHtml = '<span style="color:var(--gray-500)">Existing key will be kept (not changed)</span>';
+  } else {
+    accessKeyHtml = '<span style="color:var(--danger)">Not set</span>';
+  }
+
+  // Build preview HTML
+  const previewEl = document.getElementById('ns-step-preview');
+  if(!previewEl) return;
+
+  previewEl.innerHTML = `
+    <div class="card-title">Review Your Application</div>
+    <div class="card-subtitle">Please verify all details below before submitting</div>
+    <div class="alert alert-info" style="margin-bottom:16px;font-size:13px">
+      <strong>📋 Please review your details carefully.</strong> If anything is incorrect, click
+      "← Edit Details" to go back and fix it. Once you click "Submit", your application will be
+      sent to the Warden for review.
+    </div>
+
+    <!-- Documents preview: Photo + Signature side by side -->
+    <div style="display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="text-align:center">
+        <div style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Photo</div>
+        ${photoHtml}
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Signature</div>
+        ${sigHtml}
+      </div>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px">
+      <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy);width:35%">Full Name</td><td style="padding:8px 12px">${name}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Guardian's Name</td><td style="padding:8px 12px">${guardian}</td></tr>
+      <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Roll Number</td><td style="padding:8px 12px;font-family:monospace;font-weight:600">${rollFull}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Date of Birth</td><td style="padding:8px 12px">${dobDisplay}</td></tr>
+      <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Contact Number</td><td style="padding:8px 12px">${contact}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Guardian's Contact</td><td style="padding:8px 12px">${gcontact}</td></tr>
+      <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Email ID</td><td style="padding:8px 12px">${email}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">District</td><td style="padding:8px 12px">${district}</td></tr>
+      <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">PIN Code</td><td style="padding:8px 12px">${pin}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Address</td><td style="padding:8px 12px">${address || '—'}</td></tr>
+      <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Admission Session</td><td style="padding:8px 12px">${session}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Access Key</td><td style="padding:8px 12px">${accessKeyHtml}</td></tr>
+    </table>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="nsGo(2)">← Edit Details</button>
+      <button class="btn btn-gold" id="ns-submit-btn" onclick="nsDoSubmit()">${_editingRejectedAdmission ? 'Update Application & Re-submit' : 'Submit Application'}</button>
+    </div>`;
+
+  // Hide all steps and show preview
+  for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
+  previewEl.classList.remove('hidden');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function nsNext(from) {
-  if(!nsValidate(from)) return;
-  nsGo(from+1);
+// Actual submission — called from the preview panel's Submit button
+async function nsDoSubmit() {
+  const btn = document.getElementById('ns-submit-btn');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting…'; }
+  clearErr('ns-submit');
+
+  if(_editingRejectedAdmission) {
+    // ── EDIT MODE: call updateRejectedAdmission ──────────────────────
+    const payload = {
+      rollFull: _editingRejectedRollFull,
+      name: getVal('ns-name'),
+      guardianName: getVal('ns-guardian'),
+      dob: getVal('ns-dob'),
+      contactNo: getVal('ns-contact'),
+      guardianContact: getVal('ns-gcontact'),
+      email: getVal('ns-email').toLowerCase(),
+      district: document.getElementById('ns-district')?.value,
+      pin: getVal('ns-pin'),
+      address: getVal('ns-address'),
+      admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
+      accessKey: document.getElementById('ns-access-key')?.value || '',
+      photo: uploadedB64['photo'] || '',
+      signature: uploadedB64['sig'] || ''
+    };
+
+    const r = await callBackend('updateRejectedAdmission', payload);
+    if(btn) { btn.disabled = false; btn.innerHTML = 'Update Application & Re-submit'; }
+
+    if(r.success) {
+      _editingRejectedAdmission = false;
+      _editingRejectedRollFull  = null;
+      document.getElementById('ns-ref-display').textContent = 'Roll No: ' + payload.rollFull;
+      const successScreen = document.getElementById('ns-success');
+      const successHeading = successScreen.querySelector('h2');
+      const successPara    = successScreen.querySelector('p');
+      if(successHeading) successHeading.textContent = 'Application Re-submitted!';
+      if(successPara) successPara.innerHTML = 'Your corrected application has been sent to the Warden for review.<br/>'+
+        'Once approved, you will be able to download your <strong>Provisional Allotment Letter</strong>.<br/>'+
+        '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
+        'Status: <strong>Application Submitted</strong></span>';
+      const downloadHint = document.getElementById('ns-success-download-hint');
+      if(downloadHint) downloadHint.style.display = 'none';
+      document.getElementById('ns-step-preview').classList.add('hidden');
+      for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
+      successScreen.classList.remove('hidden');
+      window.scrollTo({top:0,behavior:'smooth'});
+      try {
+        const rd = await callBackend('getStudent', {rollFull: payload.rollFull});
+        if(rd && rd.success && rd.student) { csStudent = rd.student; }
+      } catch(_) {}
+    } else {
+      showErr('ns-submit', r.error || 'Update failed. Please try again.');
+      document.getElementById('err-ns-submit').classList.remove('hidden');
+      // Go back to preview
+      document.getElementById('ns-step-preview').classList.remove('hidden');
+    }
+  } else {
+    // ── NEW APPLICATION MODE: call newStudent ────────────────────────
+    const rollFull = getRollFull('ns-roll-no','ns-roll-branch','ns-roll-year');
+    const payload = {
+      rollFull,
+      name: toTitleCase(getVal('ns-name')),
+      guardianName: toTitleCase(getVal('ns-guardian')),
+      dob: getVal('ns-dob'),
+      contactNo: getVal('ns-contact'),
+      guardianContact: getVal('ns-gcontact'),
+      email: getVal('ns-email').toLowerCase(),
+      district: document.getElementById('ns-district')?.value,
+      pin: getVal('ns-pin'),
+      address: toSentenceCase(getVal('ns-address')),
+      admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
+      semesterNo: (document.getElementById('ns-semester')?.value || '').trim(),
+      accessKey: document.getElementById('ns-access-key')?.value || '',
+      photo: uploadedB64['photo'],
+      signature: uploadedB64['sig'],
+      status: 'new_pending',
+      submittedAt: new Date().toISOString(),
+      fines: [], payments: [], hostelInfo: null, noDuesRef: ''
+    };
+
+    const r = await callBackend('newStudent', payload);
+    if(btn) { btn.disabled = false; btn.innerHTML = 'Submit Application'; }
+
+    if(r.success) {
+      document.getElementById('ns-ref-display').textContent = 'Roll No: ' + rollFull;
+      const successHeading = document.querySelector('#ns-success h2');
+      const successPara    = document.querySelector('#ns-success p');
+      const downloadHint   = document.getElementById('ns-success-download-hint');
+      if(successHeading) successHeading.textContent = 'Application Submitted!';
+      if(successPara) successPara.innerHTML = 'Your application has been sent to the Warden for provisional approval.<br/>'+
+        'Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>'+
+        '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
+        'Your registered Email + your Access Key</span>';
+      if(downloadHint) downloadHint.style.display = '';
+      document.getElementById('ns-step-preview').classList.add('hidden');
+      for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
+      document.getElementById('ns-success').classList.remove('hidden');
+      window.scrollTo({top:0,behavior:'smooth'});
+    } else {
+      showErr('ns-submit', r.error || 'Submission failed. Please try again.');
+      document.getElementById('err-ns-submit').classList.remove('hidden');
+      document.getElementById('ns-step-preview').classList.remove('hidden');
+    }
+  }
 }
 
+// nsValidate — unified version with edit-mode support
 function nsValidate(step) {
   let ok = true;
   const req = (fieldId, msg, extra) => {
@@ -3035,7 +3263,8 @@ function nsValidate(step) {
     else if(!/^\d{4}$/.test(ryr)) { showErr('ns-roll','Year must be 4 digits'); ok=false; }
     else clearErr('ns-roll');
     if(!getVal('ns-dob')) { showErr('ns-dob','Date of birth is required'); ok=false; } else clearErr('ns-dob');
-    if(!uploadedB64['photo']) { showErr('photo','Student photo is required'); ok=false; } else clearErr('photo');
+    // In edit mode, photo is optional
+    if(!_editingRejectedAdmission && !uploadedB64['photo']) { showErr('photo','Student photo is required'); ok=false; } else clearErr('photo');
   }
   if(step === 1) {
     const c = getVal('ns-contact'), gc = getVal('ns-gcontact'), em = getVal('ns-email'), pin = getVal('ns-pin');
@@ -3047,81 +3276,57 @@ function nsValidate(step) {
     if(!sem || sem === '') { showErr('ns-semester','Please select your admission session'); ok=false; } else { clearErr('ns-semester'); }
   }
   if(step === 2) {
-    // Signature
-    if(!uploadedB64['sig']) { showErr('sig','Signature image is required'); ok=false; } else clearErr('sig');
+    // In edit mode, signature is optional
+    if(!_editingRejectedAdmission && !uploadedB64['sig']) { showErr('sig','Signature image is required'); ok=false; } else clearErr('sig');
     // Access Key
     const ak = document.getElementById('ns-access-key')?.value || '';
     const akc = document.getElementById('ns-access-key-confirm')?.value || '';
-    if(ak.length < 4) { showErr('ns-access-key','Access Key must be at least 4 characters'); ok=false; }
-    else if(ak.length > 32) { showErr('ns-access-key','Access Key must be at most 32 characters'); ok=false; }
-    else clearErr('ns-access-key');
-    if(ok || ak.length >= 4) {
-      if(ak !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); ok=false; }
-      else clearErr('ns-access-key-confirm');
+    if(_editingRejectedAdmission) {
+      // In edit mode, access key is optional (keep existing)
+      if(ak === '') {
+        clearErr('ns-access-key');
+        clearErr('ns-access-key-confirm');
+      } else {
+        if(ak.length < 4) { showErr('ns-access-key','New Access Key must be at least 4 characters'); ok=false; }
+        else if(ak.length > 32) { showErr('ns-access-key','New Access Key must be at most 32 characters'); ok=false; }
+        else {
+          clearErr('ns-access-key');
+          if(ak !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); ok=false; }
+          else clearErr('ns-access-key-confirm');
+        }
+      }
+    } else {
+      // New application — access key is required
+      if(ak.length < 4) { showErr('ns-access-key','Access Key must be at least 4 characters'); ok=false; }
+      else if(ak.length > 32) { showErr('ns-access-key','Access Key must be at most 32 characters'); ok=false; }
+      else clearErr('ns-access-key');
+      if(ok || ak.length >= 4) {
+        if(ak !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); ok=false; }
+        else clearErr('ns-access-key-confirm');
+      }
     }
   }
   return ok;
 }
 
+// nsSubmit is now just a redirect to the preview
 async function nsSubmit() {
-  if(!nsValidate(2)) return;
-  // Guard: re-validate semester (step 1 field) before final submit
-  const _semCheck = (document.getElementById('ns-semester')?.value || '').trim();
-  if(!_semCheck) {
-    nsGo(1); // go back to step 2
-    showErr('ns-semester','Please select your admission session');
-    return;
-  }
-  const btn = document.getElementById('ns-submit-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Submitting…';
-  clearErr('ns-submit');
+  nsShowPreview();
+}
 
-  const rollFull = getRollFull('ns-roll-no','ns-roll-branch','ns-roll-year');
-  const payload = {
-    rollFull,
-    name: toTitleCase(getVal('ns-name')),
-    guardianName: toTitleCase(getVal('ns-guardian')),
-    dob: getVal('ns-dob'),
-    contactNo: getVal('ns-contact'),
-    guardianContact: getVal('ns-gcontact'),
-    email: getVal('ns-email').toLowerCase(),
-    district: document.getElementById('ns-district')?.value,
-    pin: getVal('ns-pin'),
-    address: toSentenceCase(getVal('ns-address')),
-    admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
-    semesterNo: (document.getElementById('ns-semester')?.value || '').trim(),
-    accessKey: document.getElementById('ns-access-key')?.value || '',
-    photo: uploadedB64['photo'],
-    signature: uploadedB64['sig'],
-    status: 'new_pending',
-    submittedAt: new Date().toISOString(),
-    fines: [], payments: [], hostelInfo: null, noDuesRef: ''
-  };
+// nsNext — validate and go to next step
+function nsNext(from) {
+  if(!nsValidate(from)) return;
+  nsGo(from+1);
+}
 
-  const r = await callBackend('newStudent', payload);
-  btn.disabled = false; btn.innerHTML = 'Submit Application';
-
-  if(r.success) {
-    document.getElementById('ns-ref-display').textContent = 'Roll No: ' + rollFull;
-    // Reset the success screen content in case it was customized by a previous
-    // rejected-application re-submission flow.
-    const successHeading = document.querySelector('#ns-success h2');
-    const successPara    = document.querySelector('#ns-success p');
-    const downloadHint   = document.getElementById('ns-success-download-hint');
-    if(successHeading) successHeading.textContent = 'Application Submitted!';
-    if(successPara) successPara.innerHTML = 'Your application has been sent to the Warden for provisional approval.<br/>'+
-      'Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>'+
-      '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
-      'Your registered Email + your Access Key</span>';
-    if(downloadHint) downloadHint.style.display = '';
-    for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
-    document.getElementById('ns-success').classList.remove('hidden');
-    window.scrollTo({top:0,behavior:'smooth'});
-  } else {
-    showErr('ns-submit', r.error || 'Submission failed. Please try again.');
-    document.getElementById('err-ns-submit').classList.remove('hidden');
-  }
+// nsGo — navigate between steps (including preview)
+function nsGo(step) {
+  for(let i=0;i<3;i++) { const el=document.getElementById('ns-step-'+i); if(el) el.classList.toggle('hidden', i!==step); }
+  const previewEl = document.getElementById('ns-step-preview');
+  if(previewEl) previewEl.classList.add('hidden');
+  nsStep = step;
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3265,126 +3470,11 @@ function editRejectedAdmission() {
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
-// Hook into nsValidate: in edit mode, photo and signature are optional
-// (the student already has them on file from the original submission).
-const _originalNsValidate = nsValidate;
-nsValidate = function(step) {
-  if(_editingRejectedAdmission) {
-    // Temporarily bypass the photo/signature checks in edit mode.
-    // We do this by stashing any existing uploadedB64 values, calling the
-    // original validator, then restoring.
-    const hadPhoto = !!uploadedB64['photo'];
-    const hadSig   = !!uploadedB64['sig'];
-    if(!hadPhoto) uploadedB64['photo'] = '__EDIT_MODE_PLACEHOLDER__';
-    if(!hadSig)   uploadedB64['sig']   = '__EDIT_MODE_PLACEHOLDER__';
-    const result = _originalNsValidate(step);
-    // Restore: only clear the placeholders, never real uploads
-    if(!hadPhoto) delete uploadedB64['photo'];
-    if(!hadSig)   delete uploadedB64['sig'];
-    // In edit mode, access key is optional — clear any "required" error
-    if(step === 2) {
-      const akErr = document.getElementById('err-ns-access-key');
-      const akVal = document.getElementById('ns-access-key')?.value || '';
-      // If access key is blank, that's fine in edit mode (keep existing)
-      if(akVal === '') {
-        clearErr('ns-access-key');
-        clearErr('ns-access-key-confirm');
-      } else {
-        // If a new key is entered, it must meet length + match requirements
-        if(akVal.length < 4) { showErr('ns-access-key','New Access Key must be at least 4 characters'); }
-        else if(akVal.length > 32) { showErr('ns-access-key','New Access Key must be at most 32 characters'); }
-        else {
-          clearErr('ns-access-key');
-          const akc = document.getElementById('ns-access-key-confirm')?.value || '';
-          if(akVal !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); }
-          else clearErr('ns-access-key-confirm');
-        }
-      }
-      // Recompute ok based on current error visibility
-      const errEls = ['err-ns-access-key','err-ns-access-key-confirm','err-sig'].map(id => document.getElementById(id));
-      const hasErr = errEls.some(el => el && !el.classList.contains('hidden'));
-      return !hasErr;
-    }
-    return result;
-  }
-  return _originalNsValidate(step);
-};
-
-// Hook into nsSubmit: in edit mode, route to updateRejectedAdmission instead of newStudent
-const _originalNsSubmit = nsSubmit;
-nsSubmit = async function() {
-  if(!_editingRejectedAdmission) {
-    return _originalNsSubmit();
-  }
-  // ── Edit mode: validate and call updateRejectedAdmission ──────────────
-  if(!nsValidate(2)) return;
-  const _semCheck = (document.getElementById('ns-semester')?.value || '').trim();
-  if(!_semCheck) {
-    nsGo(1);
-    showErr('ns-semester','Please select your admission session');
-    return;
-  }
-  const btn = document.getElementById('ns-submit-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Updating…';
-  clearErr('ns-submit');
-
-  const payload = {
-    rollFull: _editingRejectedRollFull,
-    name: getVal('ns-name'),
-    guardianName: getVal('ns-guardian'),
-    dob: getVal('ns-dob'),
-    contactNo: getVal('ns-contact'),
-    guardianContact: getVal('ns-gcontact'),
-    email: getVal('ns-email').toLowerCase(),
-    district: document.getElementById('ns-district')?.value,
-    pin: getVal('ns-pin'),
-    address: getVal('ns-address'),
-    admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
-    accessKey: document.getElementById('ns-access-key')?.value || '',
-    photo: uploadedB64['photo'] || '',
-    signature: uploadedB64['sig'] || ''
-  };
-
-  const r = await callBackend('updateRejectedAdmission', payload);
-  btn.disabled = false;
-  btn.innerHTML = 'Update Application & Re-submit';
-
-  if(r.success) {
-    // Reset edit-mode flags
-    _editingRejectedAdmission = false;
-    _editingRejectedRollFull  = null;
-    // Show a custom success message
-    document.getElementById('ns-ref-display').textContent = 'Roll No: ' + payload.rollFull;
-    const successScreen = document.getElementById('ns-success');
-    // Customize the success screen text for re-submission
-    const successHeading = successScreen.querySelector('h2');
-    const successPara    = successScreen.querySelector('p');
-    if(successHeading) successHeading.textContent = 'Application Re-submitted!';
-    if(successPara) successPara.innerHTML = 'Your corrected application has been sent to the Warden for review.<br/>'+
-      'Once approved, you will be able to download your <strong>Provisional Allotment Letter</strong>.<br/>'+
-      '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
-      'Status: <strong>Application Submitted</strong></span>';
-    // Hide the "download letter later" hint — not relevant for a re-submission
-    const downloadHint = document.getElementById('ns-success-download-hint');
-    if(downloadHint) downloadHint.style.display = 'none';
-    for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
-    successScreen.classList.remove('hidden');
-    window.scrollTo({top:0,behavior:'smooth'});
-
-    // Refresh csStudent so the rejection notice disappears and status updates
-    try {
-      const rd = await callBackend('getStudent', {rollFull: payload.rollFull});
-      if(rd && rd.success && rd.student) {
-        csStudent = rd.student;
-        // The "Back to Home" button (nsSuccessBack) will redirect to the profile
-      }
-    } catch(_) { /* silent */ }
-  } else {
-    showErr('ns-submit', r.error || 'Update failed. Please try again.');
-    document.getElementById('err-ns-submit').classList.remove('hidden');
-  }
-};
+// NOTE: The old monkey-patch code for nsValidate and nsSubmit has been removed.
+// The edit-mode logic is now built directly into the unified nsValidate and
+// nsDoSubmit functions defined above. This fixes the bug where the monkey-patch
+// was unreliable and caused "Roll number already registered" errors when
+// editing rejected applications.
 
 // Helper to return to the student profile after a successful re-submission
 // (replaces the "Back to Home" button when in edit mode)
@@ -6953,30 +7043,31 @@ async function loadFineReceiptImage(rollFull, fineIdx, containerId) {
 
 async function verifyFinePayment(rollFull, fineIdx, verifyAction) {
   if(verifyAction === 'reject') {
-    openReasonModal({
-      title: 'Reject Fine Payment Receipt',
-      label: 'Rejection Reason',
-      placeholder: 'e.g. Receipt number mismatch, blurred image, invalid receipt...',
-      required: true,
-      confirmLabel: '✗ Reject Receipt',
-      confirmClass: 'btn-danger',
-      onConfirm: async (reason) => {
-        const r = await callBackend('verifyFinePayment', {rollFull, fineIndex:fineIdx, verifyAction:'reject', reason});
-        if(r.success) {
-          toast('Fine payment receipt rejected.', 'error');
-          // FIX: targeted refresh
-          const vfr=await callBackend('getStudent',{rollFull});
-          if(vfr.success&&vfr.student){const vi=wrStudents.findIndex(x=>x.rollFull===rollFull);if(vi>=0)wrStudents[vi]=vfr.student;}
-          renderFineVerifyList();renderWardenStats();
-        } else { toast('Failed: '+(r.error||''),'error'); }
-      }
-    });
+    // BUG FIX: Use window.prompt() instead of openReasonModal — the custom modal
+    // was not opening in some environments (same issue as leave rejection).
+    const reason = window.prompt(
+      'Reject Fine Payment Receipt\n\n' +
+      'Enter the reason for rejection (the student will see this):',
+      ''
+    );
+    if(reason === null) return; // user cancelled
+    const trimmedReason = reason.trim();
+    if(!trimmedReason) {
+      toast('Rejection reason is required.', 'error');
+      return;
+    }
+    const r = await callBackend('verifyFinePayment', {rollFull, fineIndex:fineIdx, verifyAction:'reject', reason:trimmedReason});
+    if(r.success) {
+      toast('Fine payment receipt rejected.', 'error');
+      const vfr=await callBackend('getStudent',{rollFull});
+      if(vfr.success&&vfr.student){const vi=wrStudents.findIndex(x=>x.rollFull===rollFull);if(vi>=0)wrStudents[vi]=vfr.student;}
+      renderFineVerifyList();renderWardenStats();
+    } else { toast('Failed: '+(r.error||''),'error'); }
     return;
   }
   const r = await callBackend('verifyFinePayment', {rollFull, fineIndex:fineIdx, verifyAction, reason:''});
   if(r.success) {
     toast('Fine payment verified!', 'success');
-    // FIX: targeted refresh
     const vfr2=await callBackend('getStudent',{rollFull});
     if(vfr2.success&&vfr2.student){const vi2=wrStudents.findIndex(x=>x.rollFull===rollFull);if(vi2>=0)wrStudents[vi2]=vfr2.student;}
     renderFineVerifyList();renderWardenStats();
@@ -8949,26 +9040,29 @@ function admRenderPayList() {
 // of wrStudents + renderFineVerifyList so the admin panel updates correctly.
 async function admVerifyFinePayment(rollFull, fineIdx, verifyAction) {
   if(verifyAction === 'reject') {
-    openReasonModal({
-      title: 'Reject Fine Payment Receipt',
-      label: 'Rejection Reason',
-      placeholder: 'e.g. Receipt number mismatch, blurred image, invalid receipt...',
-      required: true,
-      confirmLabel: '✗ Reject Receipt',
-      confirmClass: 'btn-danger',
-      onConfirm: async (reason) => {
-        const r = await callBackend('verifyFinePayment', {rollFull, fineIndex:fineIdx, verifyAction:'reject', reason});
-        if(r.success) {
-          toast('Fine payment receipt rejected.', 'error');
-          const vfr = await callBackend('getStudent', {rollFull});
-          if(vfr.success && vfr.student) {
-            const vi = admStudents.findIndex(x => x.rollFull === rollFull);
-            if(vi >= 0) admStudents[vi] = vfr.student;
-          }
-          admRenderPayList();
-        } else { toast('Failed: ' + (r.error||''), 'error'); }
+    // BUG FIX: Use window.prompt() instead of openReasonModal — the custom modal
+    // was not opening in some environments (same issue as leave rejection).
+    const reason = window.prompt(
+      'Reject Fine Payment Receipt\n\n' +
+      'Enter the reason for rejection (the student will see this):',
+      ''
+    );
+    if(reason === null) return; // user cancelled
+    const trimmedReason = reason.trim();
+    if(!trimmedReason) {
+      toast('Rejection reason is required.', 'error');
+      return;
+    }
+    const r = await callBackend('verifyFinePayment', {rollFull, fineIndex:fineIdx, verifyAction:'reject', reason:trimmedReason});
+    if(r.success) {
+      toast('Fine payment receipt rejected.', 'error');
+      const vfr = await callBackend('getStudent', {rollFull});
+      if(vfr.success && vfr.student) {
+        const vi = admStudents.findIndex(x => x.rollFull === rollFull);
+        if(vi >= 0) admStudents[vi] = vfr.student;
       }
-    });
+      admRenderPayList();
+    } else { toast('Failed: ' + (r.error||''), 'error'); }
     return;
   }
   const r = await callBackend('verifyFinePayment', {rollFull, fineIndex:fineIdx, verifyAction, reason:''});
