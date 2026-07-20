@@ -940,7 +940,10 @@
         <div style="font-family:'Playfair Display',serif;font-size:22px;color:var(--navy)">Warden Dashboard</div>
         <div style="font-size:13px;color:var(--gray-600)">GPM Hostel Management System</div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="wardenLogout()">Logout</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" id="wr-refresh-btn" onclick="wrRefreshAll()" style="font-size:12px">🔄 Refresh All</button>
+        <button class="btn btn-secondary btn-sm" onclick="wardenLogout()">Logout</button>
+      </div>
     </div>
 
     <div class="stat-grid" id="wr-stats"></div>
@@ -1079,6 +1082,15 @@
 
       <!-- Leave Requests Tab -->
       <div id="wr-tab-leaves" class="hidden">
+        <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="position:relative;flex:1;min-width:200px;max-width:380px">
+            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:14px;pointer-events:none">🔍</span>
+            <input id="wr-leaves-search" type="text" placeholder="Search by name or roll number…"
+              style="width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:var(--transition)"
+              oninput="wrFilterLeaves()" onfocus="this.style.borderColor='var(--navy-mid)'" onblur="this.style.borderColor='var(--gray-200)'"/>
+          </div>
+          <span id="wr-leaves-search-count" style="font-size:12px;color:var(--gray-400)"></span>
+        </div>
         <div class="section-heading">Pending Leave Requests</div>
         <div id="wr-bulk-approve-bar" style="background:#eef3ff;border:1px solid #c5d3f0;border-radius:8px;padding:12px 14px;margin-bottom:14px;display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -2138,7 +2150,10 @@
         <div style="font-family:'Playfair Display',serif;font-size:22px;color:var(--navy)">Admin Office Dashboard</div>
         <div style="font-size:13px;color:var(--gray-600)">GPM Hostel — Operational Tasks <span class="role-badge role-admin" style="margin-left:8px">Admin Office</span></div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="adminLogout()">Logout</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" id="adm-refresh-btn" onclick="admRefreshAll()" style="font-size:12px">🔄 Refresh All</button>
+        <button class="btn btn-secondary btn-sm" onclick="adminLogout()">Logout</button>
+      </div>
     </div>
 
     <!-- Stat cards -->
@@ -2493,7 +2508,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v24.0';
+const EXPECTED_BACKEND_VERSION = 'v24.3';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -5534,6 +5549,22 @@ function wardenLogout() {
   wrDataLoaded=false;
 }
 
+// ── WARDEN REFRESH ALL ──────────────────────────────────────────────────────
+// Forces a full reload of ALL data from the database (students, leaves,
+// grievances). Clears all caches and re-renders every tab.
+async function wrRefreshAll() {
+  const btn = document.getElementById('wr-refresh-btn');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Refreshing…'; }
+  wrDataLoaded = false;
+  wrStudents = [];
+  wrLeavesCache = [];
+  await loadWardenData(true);
+  await loadWardenLeaves();
+  await loadWardenGrievances();
+  if(btn) { btn.disabled = false; btn.innerHTML = '🔄 Refresh All'; }
+  toast('All data refreshed from database.', 'success');
+}
+
 async function loadWardenData(forceReload=false) {
   // Skip full reload if data already cached (unless forceReload requested)
   if(wrDataLoaded && !forceReload) {
@@ -5788,6 +5819,86 @@ function renderAllStudentsList() {
   wrFilterStudents();
 }
 
+// ══════════════════════════════════════════════════════════
+// SHARED PAGINATION SYSTEM
+// ══════════════════════════════════════════════════════════
+// PAGE_SIZE: default items per page. Can be changed by the user via the
+// page-size dropdown on each paginated tab.
+let PAGE_SIZE = 10;
+
+// Per-tab pagination state: { key: { page: 0, lastQuery: '' } }
+const _pagState = {};
+
+function _pagReset(key, query) {
+  // Only reset page to 0 if the search query changed
+  if(!_pagState[key]) _pagState[key] = { page: 0, lastQuery: '' };
+  if(_pagState[key].lastQuery !== query) {
+    _pagState[key].page = 0;
+    _pagState[key].lastQuery = query;
+  }
+}
+
+function _pagGo(key, page) {
+  if(!_pagState[key]) _pagState[key] = { page: 0, lastQuery: '' };
+  _pagState[key].page = page;
+  // Call the rerender function for this key
+  if(_rerenderFns[key]) _rerenderFns[key]();
+}
+
+function _pagChangeSize(key, newSz) {
+  PAGE_SIZE = Number(newSz) || 10;
+  if(_pagState[key]) _pagState[key].page = 0;
+  if(_rerenderFns[key]) _rerenderFns[key]();
+}
+
+// Render pagination controls HTML for a given set of items
+function _pagControls(totalItems, key) {
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  if(totalPages <= 1) return _pageSizeSelector(key);
+  const currentPage = (_pagState[key] && _pagState[key].page) || 0;
+  const clampedPage = Math.min(currentPage, totalPages - 1);
+  if(_pagState[key]) _pagState[key].page = clampedPage;
+
+  return `<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:14px;flex-wrap:wrap">
+    <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px"
+      onclick="_pagGo('${key}',0)" ${clampedPage===0?'disabled':''}>« First</button>
+    <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px"
+      onclick="_pagGo('${key}',${clampedPage-1})" ${clampedPage===0?'disabled':''}>← Prev</button>
+    <span style="font-size:12px;color:var(--gray-600);padding:0 8px">Page ${clampedPage+1} of ${totalPages} (${totalItems} items)</span>
+    <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px"
+      onclick="_pagGo('${key}',${clampedPage+1})" ${clampedPage>=totalPages-1?'disabled':''}>Next →</button>
+    <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px"
+      onclick="_pagGo('${key}',${totalPages-1})" ${clampedPage>=totalPages-1?'disabled':''}>Last »</button>
+    ${_pageSizeSelector(key)}
+  </div>`;
+}
+
+// Page-size dropdown — lets the user change items per page
+function _pageSizeSelector(key) {
+  return `<span style="font-size:11px;color:var(--gray-600);margin-left:8px">Items per page:
+    <select onchange="_pagChangeSize('${key}',this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--gray-200);border-radius:4px;margin-left:4px">
+      <option value="10" ${PAGE_SIZE===10?'selected':''}>10</option>
+      <option value="20" ${PAGE_SIZE===20?'selected':''}>20</option>
+      <option value="50" ${PAGE_SIZE===50?'selected':''}>50</option>
+      <option value="100" ${PAGE_SIZE===100?'selected':''}>100</option>
+      <option value="999999" ${PAGE_SIZE===999999?'selected':''}>All</option>
+    </select>
+  </span>`;
+}
+
+// Get the current page slice for a set of items
+function _pagSlice(items, key) {
+  const currentPage = (_pagState[key] && _pagState[key].page) || 0;
+  const totalPages = Math.ceil(items.length / PAGE_SIZE);
+  const clampedPage = Math.min(currentPage, Math.max(0, totalPages - 1));
+  if(_pagState[key]) _pagState[key].page = clampedPage;
+  const start = clampedPage * PAGE_SIZE;
+  return items.slice(start, start + PAGE_SIZE);
+}
+
+// Rerender functions registry
+const _rerenderFns = {};
+
 function wrFilterStudents() {
   const list    = document.getElementById('wr-students-list');
   const countEl = document.getElementById('wr-students-search-count');
@@ -5810,12 +5921,15 @@ function wrFilterStudents() {
 
   if(countEl) countEl.textContent = q ? `${total} result${total!==1?'s':''} found` : `${wrStudents.length} students`;
 
+  // Register rerender function for pagination
+  _rerenderFns['wr-students'] = wrFilterStudents;
+  // Reset page only if search query changed
+  _pagReset('wr-students', q);
+
   function makeRow(s) {
     const fine = (Array.isArray(s.fines)?s.fines:[]).reduce((a,f)=>a+(f.revoked?0:(f.paid?0:Number(f.amount||0))),0);
     const statusClass = s.status==='alumni'?'badge-approved':'badge-'+(s.status||'pending');
 
-    // Derive the highest semester for which payment is approved — this is the
-    // true "approved up to" session, not the admission session (admissionSession).
     const approvedSems = (Array.isArray(s.payments)?s.payments:[])
       .filter(p=>p.status==='approved' && p.paymentType==='semesterFee')
       .map(p=>String(p.sessionId||p.semester||'').trim())
@@ -5856,25 +5970,30 @@ function wrFilterStudents() {
 
   if(!active.length && !alumni.length) {
     out = `<p style="color:var(--gray-400);font-size:13px;padding:12px 0">No students match "<strong>${q}</strong>".</p>`;
-  } else {
-    if(active.length) {
-      out += `<table class="data-table">
-        <thead><tr><th>Name</th><th>Roll No.</th><th>Status</th><th>Hostel</th><th>Room</th><th>Fines</th><th></th></tr></thead>
-        <tbody>${active.map(makeRow).join('')}</tbody></table>`;
-    }
-    if(alumni.length) {
-      out += `<div class="section-heading" style="margin-top:20px">Alumni — No Dues Issued</div>
-      <table class="data-table">
-        <thead><tr><th>Name</th><th>Roll No.</th><th>Status</th><th>Hostel</th><th>No Dues Ref</th><th></th></tr></thead>
-        <tbody>${alumni.map(s=>`<tr>
-          <td style="font-weight:500;opacity:.7">${s.name}</td>
-          <td style="opacity:.7">${s.rollFull}</td>
-          <td><span class="badge badge-approved">Alumni</span></td>
-          <td style="opacity:.7">${s.hostelInfo?.hostel||'—'} ${s.hostelInfo?.roomNo||''}</td>
-          <td style="font-size:12px;color:var(--gray-600)">${s.noDuesRef||'—'}</td>
-          <td><button class="btn btn-secondary btn-sm" onclick="openApprove('${s.rollFull}',true)" style="font-size:11px;padding:4px 10px">View</button></td>
-        </tr>`).join('')}</tbody></table>`;
-    }
+    list.innerHTML = out;
+    return;
+  }
+
+  // Paginate active students
+  if(active.length) {
+    const pageItems = _pagSlice(active, 'wr-students');
+    out += `<table class="data-table">
+      <thead><tr><th>Name</th><th>Roll No.</th><th>Status</th><th>Hostel</th><th>Room</th><th>Fines</th><th></th></tr></thead>
+      <tbody>${pageItems.map(makeRow).join('')}</tbody></table>`;
+    out += _pagControls(active.length, 'wr-students');
+  }
+  if(alumni.length) {
+    out += `<div class="section-heading" style="margin-top:20px">Alumni — No Dues Issued</div>
+    <table class="data-table">
+      <thead><tr><th>Name</th><th>Roll No.</th><th>Status</th><th>Hostel</th><th>No Dues Ref</th><th></th></tr></thead>
+      <tbody>${alumni.map(s=>`<tr>
+        <td style="font-weight:500;opacity:.7">${s.name}</td>
+        <td style="opacity:.7">${s.rollFull}</td>
+        <td><span class="badge badge-approved">Alumni</span></td>
+        <td style="opacity:.7">${s.hostelInfo?.hostel||'—'} ${s.hostelInfo?.roomNo||''}</td>
+        <td style="font-size:12px;color:var(--gray-600)">${s.noDuesRef||'—'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openApprove('${s.rollFull}',true)" style="font-size:11px;padding:4px 10px">View</button></td>
+      </tr>`).join('')}</tbody></table>`;
   }
 
   list.innerHTML = out;
@@ -8723,12 +8842,81 @@ async function loadWardenLeaves() {
     </div>`;
   };
 
-  document.getElementById('wr-leave-list').innerHTML=pending.length
-    ?pending.map(l=>makeLeaveRow(l,true)).join('')
-    :'<p style="color:var(--gray-400);font-size:13px">No pending leave requests.</p>';
-  document.getElementById('wr-leave-all').innerHTML=decided.length
-    ?decided.slice().reverse().map(l=>makeLeaveRow(l,false)).join('')
-    :'<p style="color:var(--gray-400);font-size:13px">No decided leave applications yet.</p>';
+  // BUG FIX: Apply search filter + pagination to leave lists
+  wrFilterLeaves(pending, decided, makeLeaveRow);
+}
+
+// Filter + paginate the leave lists based on the search bar
+function wrFilterLeaves() {
+  if(!wrLeavesCache) return;
+  const q = (document.getElementById('wr-leaves-search')?.value||'').toLowerCase().trim();
+  const matchFn = l => !q ||
+    (l.studentName||'').toLowerCase().includes(q) ||
+    (l.rollFull||'').toLowerCase().includes(q);
+  const pending = wrLeavesCache.filter(l=>l.status==='pending' && matchFn(l));
+  const decided = wrLeavesCache.filter(l=>l.status!=='pending' && matchFn(l));
+  const countEl = document.getElementById('wr-leaves-search-count');
+  const total = pending.length + decided.length;
+  if(countEl) countEl.textContent = q ? `${total} result${total!==1?'s':''} found` : '';
+
+  // Rebuild the makeLeaveRow function (same as in loadWardenLeaves)
+  const makeLeaveRow=(l,showActions)=>{
+    const statusClass=l.status==='approved'?'badge-approved':l.status==='rejected'?'badge-rejected':'badge-pending';
+    const btnId = 'lv-btn-' + l.leaveId.replace(/[^a-zA-Z0-9]/g, '_');
+    const actions=showActions?`
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-success btn-sm" id="${btnId}-approve" onclick="decideLeave('${l.leaveId}','approved','',this)" style="font-size:11px">✓ Approve</button>
+        <button class="btn btn-danger btn-sm" id="${btnId}-reject" onclick="promptRejectLeave('${l.leaveId}',this)" style="font-size:11px">✗ Reject</button>
+      </div>`:'';
+    const dlBtn = l.status==='approved'
+      ? (l.driveUrl
+          ? `<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+               <a href="${l.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Download</a>
+               <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="regenLeavePDF('${l.leaveId}',this)">🔄 Re-generate PDF</button>
+             </div>`
+          : `<button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="regenLeavePDF('${l.leaveId}',this)">📄 Generate PDF</button>`)
+      : '';
+    return `<div style="border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:var(--navy)">${l.leaveId}</div>
+          <div style="font-weight:600;font-size:13px">${l.studentName} · ${l.rollFull}</div>
+          <div style="font-size:12px;color:var(--gray-600)">${l.reason} · ${fmtDMY(l.departureDt)} → ${fmtDMY(l.returnDt)} (${l.totalDays}d)</div>
+          <div style="font-size:12px;color:var(--gray-600)">Hostel: ${l.hostel} Room ${l.roomNo} · Mobile: ${l.mobile}</div>
+          <div style="font-size:12px;color:var(--gray-600)">Address: ${l.addressDuringLeave}</div>
+          ${l.status==='rejected'&&l.rejectionReason?`<div style="font-size:11px;color:var(--danger);margin-top:3px">Rejected: ${l.rejectionReason}</div>`:''}
+          ${actions}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="badge ${statusClass}">${l.status}</span>
+          ${dlBtn}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  // Render with pagination
+  _pagReset('wr-leave-pending', q);
+  _pagReset('wr-leave-decided', q);
+  _rerenderFns['wr-leave-pending'] = () => wrFilterLeaves();
+  _rerenderFns['wr-leave-decided'] = () => wrFilterLeaves();
+
+  const pendingList = document.getElementById('wr-leave-list');
+  if(pending.length) {
+    const pageItems = _pagSlice(pending, 'wr-leave-pending');
+    pendingList.innerHTML = pageItems.map(l=>makeLeaveRow(l,true)).join('') + _pagControls(pending.length, 'wr-leave-pending');
+  } else {
+    pendingList.innerHTML = '<p style="color:var(--gray-400);font-size:13px">No pending leave requests.</p>';
+  }
+
+  const decidedList = document.getElementById('wr-leave-all');
+  if(decided.length) {
+    const decidedReversed = decided.slice().reverse();
+    const pageItems2 = _pagSlice(decidedReversed, 'wr-leave-decided');
+    decidedList.innerHTML = pageItems2.map(l=>makeLeaveRow(l,false)).join('') + _pagControls(decidedReversed.length, 'wr-leave-decided');
+  } else {
+    decidedList.innerHTML = '<p style="color:var(--gray-400);font-size:13px">No decided leave applications yet.</p>';
+  }
 }
 
 async function decideLeave(leaveId, decision, reason, btnEl) {
@@ -8915,6 +9103,21 @@ function adminLogout() {
   document.getElementById('adm-id').value='';
   document.getElementById('adm-pass').value='';
   admStudents=[]; admStudentsLoaded=false; admAllGrievances=[]; admAllLeaves=[];
+}
+
+// ── ADMIN REFRESH ALL ───────────────────────────────────────────────────────
+// Forces a full reload of ALL data from the database (students, leaves,
+// grievances). Clears all caches and re-renders every tab.
+async function admRefreshAll() {
+  const btn = document.getElementById('adm-refresh-btn');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Refreshing…'; }
+  admStudentsLoaded = false;
+  admStudents = [];
+  admAllGrievances = [];
+  admAllLeaves = [];
+  await admLoadData();
+  if(btn) { btn.disabled = false; btn.innerHTML = '🔄 Refresh All'; }
+  toast('All data refreshed from database.', 'success');
 }
 
 async function admLoadData() {
