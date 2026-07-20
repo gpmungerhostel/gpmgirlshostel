@@ -5243,7 +5243,6 @@ async function submitConsolidatedPayment() {
   const receipt    = (document.getElementById('cp-receipt')?.value || '').trim();
   const dateVal    = (document.getElementById('cp-date')?.value    || '').trim();
   const amountVal  = (document.getElementById('cp-amount')?.value  || '').trim();
-  const imgB64     = uploadedB64['cp-img'];
 
   let ok = true;
   const showErr = (field, msg) => {
@@ -5255,7 +5254,8 @@ async function submitConsolidatedPayment() {
   if(!receipt)  showErr('receipt', 'Receipt number is required.');
   if(!dateVal)  showErr('date',    'Date of payment is required.');
   if(!amountVal || Number(amountVal) <= 0) showErr('amount', 'Enter the amount shown on the receipt.');
-  if(!imgB64)   showErr('img',     'Receipt image is required.');
+  // BUG FIX: Check uploadedFiles (not uploadedB64) since we switched to lazy base64
+  if(!uploadedFiles['cp-img']) showErr('img', 'Receipt image is required.');
   if(!ok) return;
 
   const items = (window._cpPayableItems || []).map(it => {
@@ -5271,7 +5271,25 @@ async function submitConsolidatedPayment() {
   }
 
   const btn = document.getElementById('cp-submit-btn');
-  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Submitting…'; }
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Processing receipt…'; }
+
+  // BUG FIX: Convert the receipt file to base64 before sending (lazy conversion)
+  let imgB64 = '';
+  try {
+    if(uploadedFiles['cp-img']) {
+      if(!uploadedB64['cp-img']) {
+        uploadedB64['cp-img'] = await fileToBase64(uploadedFiles['cp-img']);
+      }
+      imgB64 = uploadedB64['cp-img'];
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.textContent = '📤 Submit Payment Receipt'; }
+    const errEl = document.getElementById('err-cp-global');
+    if(errEl) { errEl.textContent = 'Error processing receipt image. Please re-upload.'; errEl.classList.remove('hidden'); }
+    return;
+  }
+
+  if(btn) { btn.innerHTML = '<span class="spinner spinner-dark"></span> Submitting…'; }
 
   const r = await callBackend('submitConsolidatedPayment', {
     rollFull:    csStudent.rollFull,
@@ -5288,6 +5306,7 @@ async function submitConsolidatedPayment() {
     csStudent = r.student;
     delete uploadedB64['cp-img'];
     delete uploadedFiles['cp-img'];
+    if(uploadedUrls && uploadedUrls['cp-img']) { URL.revokeObjectURL(uploadedUrls['cp-img']); delete uploadedUrls['cp-img']; }
     window._cpPayableItems = [];
     toast('Payment receipt submitted! Pending Admin Office verification.', 'success');
     renderDuesTab();
