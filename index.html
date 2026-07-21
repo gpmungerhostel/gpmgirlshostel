@@ -2508,7 +2508,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v24.3';
+const EXPECTED_BACKEND_VERSION = 'v24.4';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -8829,9 +8829,11 @@ async function loadWardenLeaves() {
           <div style="font-size:12px;font-weight:700;color:var(--navy)">${l.leaveId}</div>
           <div style="font-weight:600;font-size:13px">${l.studentName} · ${l.rollFull}</div>
           <div style="font-size:12px;color:var(--gray-600)">${l.reason} · ${fmtDMY(l.departureDt)} → ${fmtDMY(l.returnDt)} (${l.totalDays}d)</div>
-          <div style="font-size:12px;color:var(--gray-600)">Hostel: ${l.hostel} Room ${l.roomNo} · Mobile: ${l.mobile}</div>
+          <div style="font-size:12px;color:var(--gray-600)">Hostel: ${l.hostel} Room ${l.roomNo} · Student Mobile: ${l.mobile}</div>
+          <div style="font-size:12px;color:var(--gray-600)">Guardian Mobile: ${l.guardianMobile||'—'}</div>
           <div style="font-size:12px;color:var(--gray-600)">Address: ${l.addressDuringLeave}</div>
-          ${l.status==='rejected'&&l.rejectionReason?`<div style="font-size:11px;color:var(--danger);margin-top:3px">Rejected: ${l.rejectionReason}</div>`:''}
+          ${String(l.rejectionReason||'').startsWith('[ADMIN-FWD]') ? `<div style="font-size:11px;color:var(--info);margin-top:4px;background:#eef3ff;padding:4px 8px;border-radius:4px">📋 Forwarded by Admin Office${l.rejectionReason.replace('[ADMIN-FWD]','').trim() ? ' — ' + l.rejectionReason.replace('[ADMIN-FWD]','').trim() : ''}</div>` : ''}
+          ${l.status==='rejected'&&!String(l.rejectionReason||'').startsWith('[ADMIN-FWD]')?`<div style="font-size:11px;color:var(--danger);margin-top:3px">Rejected: ${l.rejectionReason}</div>`:''}
           ${actions}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -8882,9 +8884,11 @@ function wrFilterLeaves() {
           <div style="font-size:12px;font-weight:700;color:var(--navy)">${l.leaveId}</div>
           <div style="font-weight:600;font-size:13px">${l.studentName} · ${l.rollFull}</div>
           <div style="font-size:12px;color:var(--gray-600)">${l.reason} · ${fmtDMY(l.departureDt)} → ${fmtDMY(l.returnDt)} (${l.totalDays}d)</div>
-          <div style="font-size:12px;color:var(--gray-600)">Hostel: ${l.hostel} Room ${l.roomNo} · Mobile: ${l.mobile}</div>
+          <div style="font-size:12px;color:var(--gray-600)">Hostel: ${l.hostel} Room ${l.roomNo} · Student Mobile: ${l.mobile}</div>
+          <div style="font-size:12px;color:var(--gray-600)">Guardian Mobile: ${l.guardianMobile||'—'}</div>
           <div style="font-size:12px;color:var(--gray-600)">Address: ${l.addressDuringLeave}</div>
-          ${l.status==='rejected'&&l.rejectionReason?`<div style="font-size:11px;color:var(--danger);margin-top:3px">Rejected: ${l.rejectionReason}</div>`:''}
+          ${String(l.rejectionReason||'').startsWith('[ADMIN-FWD]') ? `<div style="font-size:11px;color:var(--info);margin-top:4px;background:#eef3ff;padding:4px 8px;border-radius:4px">📋 Forwarded by Admin Office${l.rejectionReason.replace('[ADMIN-FWD]','').trim() ? ' — ' + l.rejectionReason.replace('[ADMIN-FWD]','').trim() : ''}</div>` : ''}
+          ${l.status==='rejected'&&!String(l.rejectionReason||'').startsWith('[ADMIN-FWD]')?`<div style="font-size:11px;color:var(--danger);margin-top:3px">Rejected: ${l.rejectionReason}</div>`:''}
           ${actions}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -9875,7 +9879,7 @@ async function admRenderLeaves() {
           <div style="font-size:12px;font-weight:700;color:var(--navy)">${l.leaveId}</div>
           <div style="font-weight:600;font-size:13px">${l.studentName} · ${l.rollFull}</div>
           <div class="task-meta">${l.reason} · ${fmtDMY(l.departureDt)} → ${fmtDMY(l.returnDt)} (${l.totalDays}d)</div>
-          <div class="task-meta">Room: ${l.hostel||'—'} ${l.roomNo||''} · Mobile: ${l.mobile||'—'}</div>
+          <div class="task-meta">Room: ${l.hostel||'—'} ${l.roomNo||''} · Student Mobile: ${l.mobile||'—'} · Guardian Mobile: ${l.guardianMobile||'—'}</div>
           <div class="task-meta">Address: ${l.addressDuringLeave||'—'}</div>
           ${fwdNote}
         </div>
