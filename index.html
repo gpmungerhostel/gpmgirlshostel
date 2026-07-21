@@ -2508,7 +2508,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v24.4';
+const EXPECTED_BACKEND_VERSION = 'v24.5';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -9900,24 +9900,31 @@ async function admRenderLeaves() {
 }
 
 async function admForwardLeave(leaveId) {
-  openReasonModal({
-    title: 'Forward Leave to Warden',
-    label: 'Forwarding Note (optional)',
-    placeholder: 'e.g. Student eligibility verified, no pending dues, forwarding for decision...',
-    required: false,
-    confirmLabel: '📤 Forward to Warden',
-    confirmClass: 'btn-primary',
-    onConfirm: async (note) => {
-      const r = await callBackend('adminForwardLeave', {
-        leaveId,
-        note: note.trim() || 'Reviewed by Admin Office. Eligibility OK. Forwarded to Warden for decision.'
-      });
-      if(r.success) {
-        toast('Leave forwarded to Warden ✓','success');
-        admRenderLeaves();
-      } else { toast('Failed: '+(r.error||''),'error'); }
-    }
+  // BUG FIX: Use window.prompt() instead of openReasonModal — the custom modal
+  // was not opening (same issue as leave reject and fine payment reject).
+  const note = window.prompt(
+    'Forward Leave to Warden\n\n' +
+    'Leave ID: ' + leaveId + '\n\n' +
+    'Enter a forwarding note (optional — leave blank for default):',
+    ''
+  );
+
+  // User clicked Cancel
+  if(note === null) return;
+
+  const trimmedNote = note.trim() || 'Reviewed by Admin Office. Eligibility OK. Forwarded to Warden for decision.';
+
+  const r = await callBackend('adminForwardLeave', {
+    leaveId,
+    note: trimmedNote
   });
+
+  if(r.success) {
+    toast('Leave forwarded to Warden ✓','success');
+    admRenderLeaves();
+  } else {
+    toast('Failed: '+(r.error||''),'error');
+  }
 }
 
 // ── GRIEVANCE INTAKE (Admin) ──
