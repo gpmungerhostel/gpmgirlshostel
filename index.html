@@ -2508,7 +2508,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v24.5';
+const EXPECTED_BACKEND_VERSION = 'v25.0';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -10711,86 +10711,9 @@ async function submitResubmit() {
 }
 
 
-// ── SHARED REASON MODAL ────────────────────────────────────────────────────────
-// Replaces all browser prompt() calls. Options:
-//   title, label, placeholder, required (bool), confirmLabel, confirmClass, onConfirm(text)
-let _reasonModalCallback = null;
-
-function openReasonModal(opts) {
-  _reasonModalCallback = opts.onConfirm || null;
-  const modal = document.getElementById('reason-modal');
-  document.getElementById('reason-modal-title').textContent   = opts.title       || 'Enter Reason';
-  document.getElementById('reason-modal-label').textContent   = opts.label       || 'Reason';
-  document.getElementById('reason-modal-textarea').placeholder= opts.placeholder || '';
-  document.getElementById('reason-modal-textarea').value      = '';
-  document.getElementById('reason-modal-err').classList.add('hidden');
-  document.getElementById('reason-modal-required').style.display = opts.required ? '' : 'none';
-  const confirmBtn = document.getElementById('reason-modal-confirm');
-  confirmBtn.textContent = opts.confirmLabel || 'Confirm';
-  confirmBtn.className = 'btn ' + (opts.confirmClass || 'btn-primary');
-  document.getElementById('reason-modal-optional-hint').style.display = opts.required ? 'none' : '';
-  modal.classList.remove('hidden');
-  modal.style.display = 'flex';
-  setTimeout(() => document.getElementById('reason-modal-textarea').focus(), 80);
-}
-
-function closeReasonModal() {
-  const modal = document.getElementById('reason-modal');
-  modal.classList.add('hidden');
-  modal.style.display = 'none';
-  _reasonModalCallback = null;
-  // BUG FIX: reset the Confirm/Cancel buttons so they are not stuck disabled
-  // if the modal is reopened after a previous submit.
-  const confirmBtn = document.getElementById('reason-modal-confirm');
-  const cancelBtn  = document.getElementById('reason-modal-cancel');
-  if(confirmBtn) {
-    confirmBtn.disabled = false;
-    if(confirmBtn.dataset.originalHtml) confirmBtn.innerHTML = confirmBtn.dataset.originalHtml;
-    delete confirmBtn.dataset.originalHtml;
-  }
-  if(cancelBtn) cancelBtn.disabled = false;
-}
-
-async function submitReasonModal() {
-  const text = document.getElementById('reason-modal-textarea').value.trim();
-  const required = document.getElementById('reason-modal-required').style.display !== 'none';
-  if(required && !text) {
-    document.getElementById('reason-modal-err').textContent = 'This field is required.';
-    document.getElementById('reason-modal-err').classList.remove('hidden');
-    return;
-  }
-  document.getElementById('reason-modal-err').classList.add('hidden');
-  const cb = _reasonModalCallback;
-  // BUG FIX (leave reject button "not working"): show a loading spinner on the
-  // Confirm button and disable it while the backend call is in flight. Previously
-  // the modal closed instantly and there was no visual feedback, so wardens would
-  // click Reject again, hit the "Leave already decided" error, and conclude the
-  // button was broken.
-  const confirmBtn = document.getElementById('reason-modal-confirm');
-  const cancelBtn  = document.getElementById('reason-modal-cancel');
-  if(confirmBtn) {
-    confirmBtn.disabled = true;
-    confirmBtn.dataset.originalHtml = confirmBtn.innerHTML;
-    confirmBtn.innerHTML = '<span class="spinner"></span> Processing…';
-  }
-  if(cancelBtn) cancelBtn.disabled = true;
-  try {
-    if(cb) await cb(text);
-    closeReasonModal();
-  } catch(e) {
-    // Re-enable buttons so the user can retry after an error
-    if(confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = confirmBtn.dataset.originalHtml || 'Confirm'; }
-    if(cancelBtn)  cancelBtn.disabled = false;
-    console.error('submitReasonModal error:', e);
-    toast('Action failed: '+(e.message||'Unknown error'), 'error');
-  }
-}
-
-// Close on Escape key
+// Close on Escape key (for resubmit-modal only — reason-modal was removed)
 document.addEventListener('keydown', (e) => {
   if(e.key === 'Escape') {
-    const rm = document.getElementById('reason-modal');
-    if(rm && !rm.classList.contains('hidden')) closeReasonModal();
     const rsm = document.getElementById('resubmit-modal');
     if(rsm && !rsm.classList.contains('hidden')) closeResubmitModal();
   }
@@ -11736,30 +11659,7 @@ function quickDebarFromPanel() {
 </div>
 
 
-<!-- ── SHARED REASON MODAL ── -->
-<div id="reason-modal" class="hidden" style="position:fixed;inset:0;background:rgba(15,39,68,.55);z-index:9100;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeReasonModal()">
-  <div style="background:var(--white);border-radius:var(--radius-lg);padding:28px;max-width:440px;width:100%;box-shadow:var(--shadow-lg);animation:slideUp .25s ease">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <h3 id="reason-modal-title" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--navy)">Enter Reason</h3>
-      <button onclick="closeReasonModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);line-height:1">✕</button>
-    </div>
-    <div class="field" style="margin-bottom:6px">
-      <label id="reason-modal-label" style="display:block;font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:5px;letter-spacing:.3px;text-transform:uppercase">
-        Reason <span id="reason-modal-required" class="req" style="color:#c0392b;margin-left:2px">*</span>
-      </label>
-      <span id="reason-modal-optional-hint" style="font-size:11px;color:var(--gray-400);display:none">(Optional — leave blank to use the default message)</span>
-      <textarea id="reason-modal-textarea" rows="3"
-        style="width:100%;padding:10px 13px;border:1.5px solid var(--gray-200);border-radius:var(--radius-md);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--gray-800);background:var(--white);resize:vertical;outline:none;margin-top:6px"
-        placeholder="" onkeydown="if(event.key==='Enter'&&(event.ctrlKey||event.metaKey))submitReasonModal()"></textarea>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:3px">Ctrl+Enter to submit</div>
-      <div id="reason-modal-err" class="err-msg hidden" style="font-size:11px;color:var(--danger);margin-top:4px;font-weight:500"></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button id="reason-modal-cancel" class="btn btn-secondary" style="flex:1" onclick="closeReasonModal()">Cancel</button>
-      <button id="reason-modal-confirm" class="btn btn-primary" style="flex:2" onclick="submitReasonModal()">Confirm</button>
-    </div>
-  </div>
-</div>
+<!-- reason-modal removed — all callers now use window.prompt() -->
 
 <!-- ══════════════════════════════════════════════════════════════════════
      REPORTS MODULE — Occupancy + Leave Log
