@@ -2508,7 +2508,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v25.0';
+const EXPECTED_BACKEND_VERSION = 'v25.4';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -6172,15 +6172,48 @@ async function openApprove(rollFull, viewOnly=false) {
     const dueDateDiv = document.createElement('div');
     dueDateDiv.id = 'wr-new-due-date';
 
-    // BUG FIX: The payment deadline defaults to 5 days from today (auto-calculated),
-    // but the warden CAN manually override it if needed. The input is pre-filled
-    // with the 5-day default so the warden can either accept it as-is or change it.
-    const _autoDeadline = fmtYMD(new Date(Date.now() + 5*24*60*60*1000));
-    const _autoDeadlineDisplay = new Date(Date.now() + 5*24*60*60*1000).toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
+    // v25.1: The DEFAULT payment due date for every new application is the LAST DATE
+    // of the application period (Panel 1 config: date_window_provisional.end —
+    // cached in window._adminProvDeadline on warden login). The Warden can override
+    // it. If no application window is configured, fall back to today + 5 days.
+    const _appLastDate = (typeof window._adminProvDeadline === 'string' && window._adminProvDeadline)
+                         ? window._adminProvDeadline : '';
+    const _todayYMD = todayYMD();
+    let _defaultDeadline, _defaultDeadlineDisplay, _defaultDeadlineSource;
+    if(_appLastDate) {
+      _defaultDeadline = _appLastDate;
+      const _dp = _appLastDate.split('-');
+      _defaultDeadlineDisplay = new Date(parseInt(_dp[0]), parseInt(_dp[1])-1, parseInt(_dp[2]))
+        .toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
+      _defaultDeadlineSource = 'application window last date (' + _defaultDeadlineDisplay + ')';
+    } else {
+      _defaultDeadline = fmtYMD(new Date(Date.now() + 5*24*60*60*1000));
+      _defaultDeadlineDisplay = new Date(Date.now() + 5*24*60*60*1000)
+        .toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
+      _defaultDeadlineSource = 'today + 5 days (' + _defaultDeadlineDisplay + ') — Panel 1 window not configured';
+    }
+
+    // v25.1: Detect if THIS issuance will be a LATE application — i.e., today's date
+    // is AFTER the official application window's last date. If so, show a warning banner
+    // AND the resulting PDF will display a "LATE APPLICATION" badge.
+    let _lateWarnHtml = '';
+    if(_appLastDate && _todayYMD > _appLastDate) {
+      const _dp = _appLastDate.split('-');
+      const _lastDateDisplay = new Date(parseInt(_dp[0]), parseInt(_dp[1])-1, parseInt(_dp[2]))
+        .toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
+      const _daysLate = Math.floor((new Date(_todayYMD) - new Date(_appLastDate)) / 86400000);
+      _lateWarnHtml = `
+        <div class="alert" style="background:#fdf0f0;border-left:4px solid #8b1a1a;border-radius:6px;padding:10px 14px;margin:10px 0;font-size:13px;color:#5a0e0e">
+          <strong>⚠ LATE APPLICATION</strong> — Today (${_todayYMD}) is <strong>${_daysLate} day(s) after</strong> the official application last date (${_lastDateDisplay}).
+          The Provisional Letter PDF will display a prominent <strong>"LATE APPLICATION"</strong> badge.
+          Late fine rules apply per the due date below.
+        </div>`;
+    }
 
     dueDateDiv.innerHTML = `
       <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
       <div class="section-heading">📋 Issue Provisional Hostel Allotment Letter</div>
+      ${_lateWarnHtml}
       <div class="alert alert-info" style="margin-bottom:14px;font-size:13px">
         Review the student's application details above, then issue the
         <strong>Provisional Hostel Allotment Letter</strong>. The student will be
@@ -6189,11 +6222,14 @@ async function openApprove(rollFull, viewOnly=false) {
       </div>
       <div class="field">
         <label>Fee Payment Due Date <span class="req">*</span></label>
-        <input type="date" id="wr-prov-due-date" value="${_autoDeadline}" min="${todayYMD()}"/>
+        <input type="date" id="wr-prov-due-date" value="${_defaultDeadline}" min="${todayYMD()}"/>
         <div class="hint" id="wr-prov-due-hint" style="margin-top:5px">
-          <span style="color:var(--success);font-weight:600">✅ Auto-filled: 5 days from today (${_autoDeadlineDisplay}).</span>
-          <span style="color:var(--gray-600)">You may change this date if needed.</span><br/>
-          <span style="font-size:11px;color:var(--gray-500)">Late fine ₹50/day (max ₹500) applies after this date — visible to both student and Warden in real time.</span>
+          <span style="color:var(--success);font-weight:600">✅ Auto-filled: ${_defaultDeadlineSource}.</span>
+          <span style="color:var(--gray-600)">You may override this date if you want to grant an extension.</span><br/>
+          <span style="font-size:11px;color:var(--gray-500)">
+            Late fine ₹50/day (max ₹500) is counted from this due date — visible to both student and Warden in real time.
+            ${_appLastDate ? 'If you extend the deadline, the late fine will be calculated from the extended date instead of the original application last date.' : ''}
+          </span>
         </div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
@@ -7072,15 +7108,15 @@ async function issueHDNForStudent(rollFull) {
 
 // ── PROVISIONAL APPROVE (new students — warden issues provisional allotment letter) ──
 // Room / bed assignment happens at FINAL approval after fee payment, not at provisional stage.
-// BUG FIX: The due date input is pre-filled with 5 days from today (auto-calculated),
-// but the warden can change it. The warden-set date is sent to the backend.
+// v25.1: The due date input is pre-filled with the application window's last date
+// (Panel 1 config) — the warden can override it. The warden-set date is sent to the backend.
 async function doProvisionalApprove(rollFull) {
   const dueDateInput = document.getElementById('wr-prov-due-date');
   const dueDate = dueDateInput?.value;
   const btn = document.getElementById('wr-approve-btn-new') || document.getElementById('wr-approve-btn');
   if(btn) { btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Issuing Provisional Letter…'; }
 
-  // Validate due date — the warden must set a date (pre-filled with 5 days from today)
+  // Validate due date — the warden must set a date (pre-filled with application last date)
   if(!dueDate) {
     const res = document.getElementById('wr-prov-issue-result');
     if(res) res.innerHTML='<div class="alert alert-danger">Please set a fee payment due date.</div>';
@@ -7096,7 +7132,7 @@ async function doProvisionalApprove(rollFull) {
   const r = await callBackend('provisionalApprove', {
     rollFull,
     hostelInfo: null,   // no room assignment at provisional stage
-    dueDate: dueDateDisplay,   // warden-set date (defaults to 5 days from today)
+    dueDate: dueDateDisplay,   // warden-set date (defaults to application window last date)
     dueDateISO: dueDate,       // YYYY-MM-DD for storage
     refNo: `GPMH/HPA/${rollFull}`
   });
@@ -10872,16 +10908,23 @@ async function verifyAndDownload() {
 }
 
 // ── RE-GENERATE PROVISIONAL LETTER (warden) ─────────────────────────────────────
-// BUG FIX: The warden can now change the payment deadline when re-generating the
-// provisional letter. A prompt asks for the new deadline (defaulting to the
-// current stored deadline or 5 days from today). The new deadline is sent to the
-// backend, which updates the PDF and the stored provisionalPaymentDeadline.
+// v25.1: The warden can change the payment deadline when re-generating the
+// provisional letter. The default is the current stored deadline; if none, it
+// falls back to the application window's last date (Panel 1); if neither is set,
+// to today + 5 days. The new deadline is sent to the backend, which updates the
+// PDF and the stored provisionalPaymentDeadline.
 async function regenProvisionalLetter(rollFull, btn) {
   // Find the student's current deadline (if any)
   const s = wrStudents.find(x => x.rollFull === rollFull);
   const dl = s ? getDriveLinks(s) : {};
   const currentDeadline = dl.provisionalPaymentDeadline || '';
-  const defaultDeadline = currentDeadline || fmtYMD(new Date(Date.now() + 5*24*60*60*1000));
+  const appLastDate = (typeof window._adminProvDeadline === 'string' && window._adminProvDeadline)
+                      ? window._adminProvDeadline : '';
+  const defaultDeadline = currentDeadline || appLastDate || fmtYMD(new Date(Date.now() + 5*24*60*60*1000));
+
+  // v25.1: Show whether the original application was late (frozen flag stored at issuance)
+  const isLateApp = (dl && dl.isLateApplication === true);
+  const frozenAppLast = (dl && dl.applicationLastDate) ? dl.applicationLastDate : '';
 
   // Build a modal for the warden to confirm + set a new deadline
   const overlay = document.createElement('div');
@@ -10897,12 +10940,17 @@ async function regenProvisionalLetter(rollFull, btn) {
         Re-generating will overwrite the existing Provisional Allotment Letter PDF in Drive.
         You can also update the payment deadline below.
       </div>
+      ${isLateApp ? `
+        <div style="background:#fdf0f0;border-left:4px solid #8b1a1a;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:#5a0e0e">
+          <strong>⚠ LATE APPLICATION</strong> — This application was originally submitted after the official last date
+          ${frozenAppLast ? '(' + frozenAppLast + ')' : ''}. The re-issued letter will continue to display the LATE APPLICATION badge.
+        </div>` : ''}
       <div class="field" style="margin-bottom:14px">
         <label>Payment Due Date <span class="req">*</span></label>
         <input type="date" id="regen-prov-deadline" value="${defaultDeadline}" min="${todayYMD()}"
           style="width:100%;padding:9px 11px;border:1.5px solid var(--gray-200);border-radius:7px;font-size:14px;box-sizing:border-box"/>
         <div style="font-size:11px;color:var(--gray-500);margin-top:4px">
-          ${currentDeadline ? 'Current deadline: ' + currentDeadline + '. ' : ''}Change if needed. Late fine ₹50/day (max ₹500) applies after this date.
+          ${currentDeadline ? 'Current deadline: ' + currentDeadline + '. ' : (appLastDate ? 'Default: application last date (' + appLastDate + '). ' : '')}Change if needed. Late fine ₹50/day (max ₹500) is counted from this date.
         </div>
       </div>
       <div id="regen-prov-err" style="color:#c0392b;font-size:12px;margin-bottom:8px;display:none"></div>
@@ -10959,6 +11007,7 @@ async function regenProvisionalLetter(rollFull, btn) {
             let dlUpdated = getDriveLinks(s);
             dlUpdated.provisionalLetter = r.driveUrl;
             dlUpdated.provisionalPaymentDeadline = newDeadline;
+            if(typeof r.isLateApplication === 'boolean') dlUpdated.isLateApplication = r.isLateApplication;
             s.driveLinks = dlUpdated;
           }
           setTimeout(() => openApprove(rollFull, true), 1500);
