@@ -1219,25 +1219,32 @@
         <div class="section-heading">Unlock Student Account</div>
         <div class="alert alert-warning" style="margin-bottom:16px;font-size:13px">
           A student account is locked after <strong>5 wrong passwords</strong> and <strong>2 failed password resets</strong>.
-          Enter the student's roll number and the master key to unlock their account.
+          Enter the student's roll number, click <strong>Search</strong> to verify the student's identity, then enter the master key to unlock their account.
         </div>
         <div class="field">
           <label>Student Roll Number <span class="req">*</span></label>
-          <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
-            <input type="text" id="wr-unlock-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
-                   oninput="_sanitizeEnglishInput(this)"
-                   style="text-align:center;font-weight:600"/>
-            <select id="wr-unlock-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
-              <option>CE</option><option selected>CSE</option><option>EE</option>
-              <option>EC</option><option>FTS</option><option>ME</option>
-            </select>
-            <input type="text" id="wr-unlock-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
-                   oninput="_sanitizeEnglishInput(this)"
-                   style="text-align:center;font-weight:600"/>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+            <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+              <input type="text" id="wr-unlock-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrUnlockSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+              <select id="wr-unlock-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+                <option>CE</option><option selected>CSE</option><option>EE</option>
+                <option>EC</option><option>FTS</option><option>ME</option>
+              </select>
+              <input type="text" id="wr-unlock-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrUnlockSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="_wrUnlockSearchStudent()" id="wr-unlock-search-btn" style="white-space:nowrap">🔍 Search Student</button>
           </div>
-          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026)</div>
+          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026) — click Search to verify identity</div>
           <div class="err-msg hidden" id="err-wr-unlock-email"></div>
         </div>
+        <!-- v25.9: Student info preview — shown after Search button is clicked -->
+        <div id="wr-unlock-student-preview" style="margin-bottom:16px"></div>
         <div class="field">
           <label>Master Key <span class="req">*</span></label>
           <div style="position:relative">
@@ -2339,25 +2346,32 @@
         </div>
         <div class="alert alert-warning" style="margin-bottom:16px;font-size:13px">
           A student account is locked after <strong>5 wrong passwords</strong> and <strong>2 failed password resets</strong>.
-          Verify student identity in person, then enter their roll number and the master key to unlock.
+          Enter the student's roll number, click <strong>Search</strong> to verify identity, then enter the master key to unlock.
         </div>
         <div class="field">
           <label>Student Roll Number <span class="req">*</span></label>
-          <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
-            <input type="text" id="adm-unlock-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
-                   oninput="_sanitizeEnglishInput(this)"
-                   style="text-align:center;font-weight:600"/>
-            <select id="adm-unlock-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
-              <option>CE</option><option selected>CSE</option><option>EE</option>
-              <option>EC</option><option>FTS</option><option>ME</option>
-            </select>
-            <input type="text" id="adm-unlock-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
-                   oninput="_sanitizeEnglishInput(this)"
-                   style="text-align:center;font-weight:600"/>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+            <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+              <input type="text" id="adm-unlock-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_admUnlockSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+              <select id="adm-unlock-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+                <option>CE</option><option selected>CSE</option><option>EE</option>
+                <option>EC</option><option>FTS</option><option>ME</option>
+              </select>
+              <input type="text" id="adm-unlock-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_admUnlockSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="_admUnlockSearchStudent()" id="adm-unlock-search-btn" style="white-space:nowrap">🔍 Search Student</button>
           </div>
-          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026)</div>
+          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026) — click Search to verify identity</div>
           <div class="err-msg hidden" id="err-adm-unlock-email"></div>
         </div>
+        <!-- v25.9: Student info preview — shown after Search button is clicked -->
+        <div id="adm-unlock-student-preview" style="margin-bottom:16px"></div>
         <div class="field">
           <label>Master Key <span class="req">*</span></label>
           <div style="position:relative">
@@ -2695,7 +2709,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v25.8';
+const EXPECTED_BACKEND_VERSION = 'v25.9';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -5695,6 +5709,80 @@ async function reissueAllotmentLetterForStudent(rollFull) {
   }
 }
 
+// v25.9: Search student by roll number for the Unlock Account tab.
+// Fetches student info + photo and displays a preview card so the warden can
+// verify the student's identity before unlocking.
+let _wrUnlockPreviewStudent = null;
+async function _wrUnlockSearchStudent() {
+  const no  = (document.getElementById('wr-unlock-roll-no')?.value||'').trim();
+  const br  = document.getElementById('wr-unlock-roll-branch')?.value||'';
+  const yr  = (document.getElementById('wr-unlock-roll-year')?.value||'').trim();
+  const previewEl = document.getElementById('wr-unlock-student-preview');
+  const searchBtn = document.getElementById('wr-unlock-search-btn');
+  if(!previewEl) return;
+
+  if(!no || !br || !yr) {
+    previewEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter all three roll number fields (Number / Branch / Year).</div>';
+    _wrUnlockPreviewStudent = null;
+    clearErr('wr-unlock-email');
+    return;
+  }
+  const rollFull = `${no}/${br}/${yr}`;
+
+  // Show loading state
+  if(searchBtn) { searchBtn.disabled = true; searchBtn.innerHTML = '<span class="spinner spinner-dark"></span> Searching…'; }
+  previewEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Fetching student details…</div>';
+  clearErr('wr-unlock-email');
+
+  try {
+    const r = await callBackend('getStudent', { rollFull });
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+
+    if(!r || !r.success || !r.student) {
+      _wrUnlockPreviewStudent = null;
+      previewEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">❌ No student found with roll number <strong>${rollFull}</strong>. Please check and try again.</div>`;
+      return;
+    }
+    _wrUnlockPreviewStudent = r.student;
+    // Fetch photo in background (non-blocking)
+    _wrUnlockRenderPreview(r.student, null);
+    callBackend('getProfileImages', { rollFull: rollFull }).then(pr => {
+      if(pr && pr.success && pr.photo) {
+        _wrUnlockRenderPreview(r.student, pr.photo);
+      }
+    }).catch(()=>{});
+  } catch(e) {
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+    _wrUnlockPreviewStudent = null;
+    previewEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown error'}</div>`;
+  }
+}
+
+function _wrUnlockRenderPreview(s, photoB64) {
+  const previewEl = document.getElementById('wr-unlock-student-preview');
+  if(!previewEl || !s) return;
+  const hi = s.hostelInfo || {};
+  const roomStr = hi.hostel ? `${hi.hostel} · Room ${hi.roomNo||'—'} · Bed ${hi.bedNo||'—'}` : 'Not allotted';
+  const photoHtml = photoB64
+    ? `<img src="data:image/jpeg;base64,${photoB64}" style="width:72px;height:88px;object-fit:cover;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm)"/>`
+    : `<div style="width:72px;height:88px;border:1.5px dashed var(--gray-200);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:11px;text-align:center">No<br>Photo</div>`;
+  previewEl.innerHTML = `
+    <div style="border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;background:#fafbfc">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✓ Student Verified</div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="flex-shrink:0">${photoHtml}</div>
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px">
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Name</span><br/><strong style="color:var(--navy)">${_esc(s.name||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Roll No.</span><br/><strong>${_esc(s.rollFull||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Status</span><br/><span class="badge badge-${s.status||'pending'}">${s.status||'—'}</span></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Contact</span><br/><strong>${_esc(s.contactNo||'—')}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Hostel / Room</span><br/><strong>${_esc(roomStr)}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Email</span><br/><strong style="word-break:break-all">${_esc(s.email||'—')}</strong></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function wardenUnlockStudentAccount() {
   // v25.8: Use roll number (3-part input) instead of email.
   const no  = (document.getElementById('wr-unlock-roll-no')?.value||'').trim();
@@ -5707,6 +5795,11 @@ async function wardenUnlockStudentAccount() {
   if(!rollFull) { showErr('wr-unlock-email','Student roll number required (all 3 fields)'); document.getElementById('err-wr-unlock-email').classList.remove('hidden'); ok=false; } else clearErr('wr-unlock-email');
   if(!masterKey) { showErr('wr-unlock-key','Master key required'); document.getElementById('err-wr-unlock-key').classList.remove('hidden'); ok=false; } else clearErr('wr-unlock-key');
   if(!ok) return;
+  // v25.9: Require the warden to search + verify the student first.
+  if(!_wrUnlockPreviewStudent || _wrUnlockPreviewStudent.rollFull !== rollFull) {
+    resultDiv.innerHTML = `<div class="alert alert-warning">⚠ Please click <strong>🔍 Search Student</strong> first to verify the student's identity before unlocking.</div>`;
+    return;
+  }
 
   const btn = document.getElementById('btn-wr-unlock');
   btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Unlocking…';
@@ -5718,6 +5811,10 @@ async function wardenUnlockStudentAccount() {
     document.getElementById('wr-unlock-roll-no').value='';
     document.getElementById('wr-unlock-roll-year').value='';
     document.getElementById('wr-unlock-masterkey').value='';
+    // v25.9: Clear the preview
+    _wrUnlockPreviewStudent = null;
+    const previewEl = document.getElementById('wr-unlock-student-preview');
+    if(previewEl) previewEl.innerHTML = '';
   } else {
     resultDiv.innerHTML=`<div class="alert alert-danger">⚠ ${r.error||'Failed to unlock account.'}</div>`;
   }
@@ -6335,6 +6432,10 @@ function wrTab(name) {
     if(rollYrEl) rollYrEl.value='';
     document.getElementById('wr-unlock-masterkey').value='';
     document.getElementById('wr-unlock-result').innerHTML='';
+    // v25.9: Clear the student preview
+    _wrUnlockPreviewStudent = null;
+    const previewEl = document.getElementById('wr-unlock-student-preview');
+    if(previewEl) previewEl.innerHTML = '';
     clearErr('wr-unlock-email'); clearErr('wr-unlock-key');
   }
 }
@@ -9759,6 +9860,10 @@ function admTab(name) {
     if(rollYrEl) rollYrEl.value='';
     document.getElementById('adm-unlock-masterkey').value='';
     document.getElementById('adm-unlock-result').innerHTML='';
+    // v25.9: Clear the student preview
+    _admUnlockPreviewStudent = null;
+    const previewEl = document.getElementById('adm-unlock-student-preview');
+    if(previewEl) previewEl.innerHTML = '';
   }
   else if(name==='nodues') {
     document.getElementById('adm-nd-result').classList.add('hidden');
@@ -10385,6 +10490,76 @@ async function admRejectPaymentConfirm(rollFull, paymentIndex, inlineId) {
 }
 
 // ── ACCOUNT UNLOCK (Admin) ──
+// v25.9: Search student by roll number for the Admin Unlock Account tab.
+let _admUnlockPreviewStudent = null;
+async function _admUnlockSearchStudent() {
+  const no  = (document.getElementById('adm-unlock-roll-no')?.value||'').trim();
+  const br  = document.getElementById('adm-unlock-roll-branch')?.value||'';
+  const yr  = (document.getElementById('adm-unlock-roll-year')?.value||'').trim();
+  const previewEl = document.getElementById('adm-unlock-student-preview');
+  const searchBtn = document.getElementById('adm-unlock-search-btn');
+  if(!previewEl) return;
+
+  if(!no || !br || !yr) {
+    previewEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter all three roll number fields (Number / Branch / Year).</div>';
+    _admUnlockPreviewStudent = null;
+    clearErr('adm-unlock-email');
+    return;
+  }
+  const rollFull = `${no}/${br}/${yr}`;
+
+  if(searchBtn) { searchBtn.disabled = true; searchBtn.innerHTML = '<span class="spinner spinner-dark"></span> Searching…'; }
+  previewEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Fetching student details…</div>';
+  clearErr('adm-unlock-email');
+
+  try {
+    const r = await callBackend('getStudent', { rollFull });
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+
+    if(!r || !r.success || !r.student) {
+      _admUnlockPreviewStudent = null;
+      previewEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">❌ No student found with roll number <strong>${rollFull}</strong>. Please check and try again.</div>`;
+      return;
+    }
+    _admUnlockPreviewStudent = r.student;
+    _admUnlockRenderPreview(r.student, null);
+    callBackend('getProfileImages', { rollFull: rollFull }).then(pr => {
+      if(pr && pr.success && pr.photo) {
+        _admUnlockRenderPreview(r.student, pr.photo);
+      }
+    }).catch(()=>{});
+  } catch(e) {
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+    _admUnlockPreviewStudent = null;
+    previewEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown error'}</div>`;
+  }
+}
+
+function _admUnlockRenderPreview(s, photoB64) {
+  const previewEl = document.getElementById('adm-unlock-student-preview');
+  if(!previewEl || !s) return;
+  const hi = s.hostelInfo || {};
+  const roomStr = hi.hostel ? `${hi.hostel} · Room ${hi.roomNo||'—'} · Bed ${hi.bedNo||'—'}` : 'Not allotted';
+  const photoHtml = photoB64
+    ? `<img src="data:image/jpeg;base64,${photoB64}" style="width:72px;height:88px;object-fit:cover;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm)"/>`
+    : `<div style="width:72px;height:88px;border:1.5px dashed var(--gray-200);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:11px;text-align:center">No<br>Photo</div>`;
+  previewEl.innerHTML = `
+    <div style="border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;background:#fafbfc">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✓ Student Verified</div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="flex-shrink:0">${photoHtml}</div>
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px">
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Name</span><br/><strong style="color:var(--navy)">${_esc(s.name||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Roll No.</span><br/><strong>${_esc(s.rollFull||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Status</span><br/><span class="badge badge-${s.status||'pending'}">${s.status||'—'}</span></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Contact</span><br/><strong>${_esc(s.contactNo||'—')}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Hostel / Room</span><br/><strong>${_esc(roomStr)}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Email</span><br/><strong style="word-break:break-all">${_esc(s.email||'—')}</strong></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function adminUnlockAccount() {
   // v25.8: Use roll number (3-part input) instead of email.
   const no  = (document.getElementById('adm-unlock-roll-no')?.value||'').trim();
@@ -10397,6 +10572,11 @@ async function adminUnlockAccount() {
   if(!rollFull) { showErr('adm-unlock-email','Student roll number required (all 3 fields)'); document.getElementById('err-adm-unlock-email').classList.remove('hidden'); ok=false; } else clearErr('adm-unlock-email');
   if(!masterKey) { showErr('adm-unlock-key','Master key required'); document.getElementById('err-adm-unlock-key').classList.remove('hidden'); ok=false; } else clearErr('adm-unlock-key');
   if(!ok) return;
+  // v25.9: Require the admin to search + verify the student first.
+  if(!_admUnlockPreviewStudent || _admUnlockPreviewStudent.rollFull !== rollFull) {
+    resultDiv.innerHTML = `<div class="alert alert-warning">⚠ Please click <strong>🔍 Search Student</strong> first to verify the student's identity before unlocking.</div>`;
+    return;
+  }
   const btn = document.getElementById('btn-adm-unlock');
   btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Unlocking…';
   const r = await callBackend('adminUnlockAccount', {rollFull, masterKey});
@@ -10406,6 +10586,10 @@ async function adminUnlockAccount() {
     document.getElementById('adm-unlock-roll-no').value='';
     document.getElementById('adm-unlock-roll-year').value='';
     document.getElementById('adm-unlock-masterkey').value='';
+    // v25.9: Clear the preview
+    _admUnlockPreviewStudent = null;
+    const previewEl = document.getElementById('adm-unlock-student-preview');
+    if(previewEl) previewEl.innerHTML = '';
   } else {
     resultDiv.innerHTML=`<div class="alert alert-danger">⚠ ${r.error||'Failed to unlock account.'}</div>`;
   }
