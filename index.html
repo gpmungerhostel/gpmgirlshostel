@@ -334,6 +334,18 @@
       </div>
       <div class="home-card-arrow">›</div>
     </div>
+
+  <!-- v25.5 Bug 4: Notice Panel (public, shown on home page) -->
+  <div id="home-notices-panel" style="margin-top:24px;background:#fff;border:1.5px solid var(--gray-200);border-radius:var(--radius-lg);padding:20px 24px;box-shadow:0 2px 8px rgba(15,39,68,.06)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0;font-size:18px;color:var(--navy);font-family:'Playfair Display',serif">📢 Notices &amp; Announcements</h2>
+      <button class="btn btn-secondary btn-sm" onclick="loadHomeNotices()" style="font-size:11px">🔄 Refresh</button>
+    </div>
+    <div id="home-notices-list">
+      <p style="color:var(--gray-400);font-size:13px;text-align:center;padding:20px 0">Loading notices…</p>
+    </div>
+  </div>
+
   </div>
 </section>
 
@@ -360,14 +372,18 @@
       <div class="err-msg hidden" id="err-ns-guardian"></div>
     </div>
     <div class="field">
-      <label>Roll Number <span class="req">*</span></label>
+      <label>Roll Number <span class="req">*</span> <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--gray-500)">(English letters &amp; digits only)</span></label>
       <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
-        <input type="text" id="ns-roll-no" maxlength="3" placeholder="25" oninput="updateRollPreview()" style="text-align:center;font-weight:600"/>
+        <input type="text" id="ns-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+               oninput="_sanitizeEnglishInput(this); updateRollPreview()"
+               style="text-align:center;font-weight:600"/>
         <select id="ns-roll-branch" onchange="updateRollPreview()" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
           <option>CE</option><option selected>CSE</option><option>EE</option>
           <option>EC</option><option>FTS</option><option>ME</option>
         </select>
-        <input type="text" id="ns-roll-year" maxlength="4" placeholder="2026" oninput="updateRollPreview()" style="text-align:center;font-weight:600"/>
+        <input type="text" id="ns-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+               oninput="_sanitizeEnglishInput(this); updateRollPreview()"
+               style="text-align:center;font-weight:600"/>
       </div>
       <div class="roll-preview" id="roll-preview">Preview: __/CSE/2026</div>
       <div class="err-msg hidden" id="err-ns-roll"></div>
@@ -734,7 +750,9 @@
       </div>
 
       <!-- Info Tab -->
-      <div id="cs-tab-info">
+              <!-- v25.5 Bug 5: Messages from Warden/Admin -->
+        <div id="cs-messages-section" style="margin-bottom:18px"></div>
+<div id="cs-tab-info">
         <div class="info-grid" id="cs-info-grid"></div>
         <!-- Documents download section -->
         <div id="cs-doc-links"></div>
@@ -965,7 +983,9 @@
         </button>
         <button class="tab-btn" onclick="wrTab('unlock')">🔓 Unlock Account</button>
         <button class="tab-btn" onclick="wrTab('datesettings')">📅 Date Windows</button>
-        <button class="tab-btn" onclick="wrTab('reports')">📊 Reports</button>
+        <button class="tab-btn" onclick="wrTab('reports')">📊 Reports</button>        <button class="tab-btn" onclick="wrTab('messages')" id="wr-tab-btn-messages">✉️ Messages</button>
+        <button class="tab-btn" onclick="wrTab('notices')" id="wr-tab-btn-notices">📢 Notices</button>
+
         <button class="tab-btn" onclick="wrTab('debar')" id="wr-tab-btn-debar">🚫 Debar Students</button>
       </div>
 
@@ -1000,12 +1020,18 @@
       <!-- Fines Tab -->
       <div id="wr-tab-fines" class="hidden">
         <div class="section-heading">Impose Fine</div>
-        <div class="field">
-          <label>Select Student <span class="req">*</span></label>
-          <select id="wr-fine-student">
-            <option value="">— Select approved student —</option>
-          </select>
+        <div class="field" style="position:relative">
+          <label>Search Student (Roll No. / Name) <span class="req">*</span></label>
+          <input type="text" id="wr-fine-student-search" placeholder="Type roll number or name…"
+                 autocomplete="off"
+                 oninput="_wrFineStudentSearch(this.value)"
+                 onfocus="_wrFineStudentShow(true)"
+                 onblur="_wrFineStudentShow(false)"/>
+          <input type="hidden" id="wr-fine-student"/>
           <div class="err-msg hidden" id="err-wr-fine-student"></div>
+          <div id="wr-fine-student-dropdown"
+               style="position:absolute;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--gray-200);border-radius:0 0 var(--radius-md) var(--radius-md);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;display:none"></div>
+          <div id="wr-fine-student-pill" style="margin-top:6px;display:none"></div>
         </div>
         <div class="form-row">
           <div class="field">
@@ -1047,19 +1073,23 @@
         <button class="btn btn-danger" onclick="imposeFine()" id="wr-impose-btn">Impose Fine</button>
         <hr class="divider"/>
         <div class="section-heading">Revoke Fine</div>
-        <div class="form-row">
-          <div class="field">
-            <label>Select Student</label>
-            <select id="wr-revoke-student" onchange="populateFinesList()">
-              <option value="">— Select student —</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Select Fine</label>
-            <select id="wr-revoke-fine">
-              <option value="">— Select fine —</option>
-            </select>
-          </div>
+        <div class="field" style="position:relative">
+          <label>Search Student (Roll No. / Name)</label>
+          <input type="text" id="wr-revoke-student-search" placeholder="Type roll number or name…"
+                 autocomplete="off"
+                 oninput="_wrRevokeStudentSearch(this.value)"
+                 onfocus="_wrRevokeStudentShow(true)"
+                 onblur="_wrRevokeStudentShow(false)"/>
+          <input type="hidden" id="wr-revoke-student"/>
+          <div id="wr-revoke-student-dropdown"
+               style="position:absolute;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--gray-200);border-radius:0 0 var(--radius-md) var(--radius-md);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;display:none"></div>
+          <div id="wr-revoke-student-pill" style="margin-top:6px;display:none"></div>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>Select Fine</label>
+          <select id="wr-revoke-fine">
+            <option value="">— Select fine —</option>
+          </select>
         </div>
         <div class="form-row" style="margin-top:12px;margin-bottom:12px">
           <div class="field" style="margin-bottom:0">
@@ -1889,7 +1919,81 @@
 
       </div><!-- end wr-tab-reports -->
 
-      <!-- Debar Students Tab -->
+      <!-- Debar Students Tab -->      <!-- Messages Tab (v25.5) -->
+      <div id="wr-tab-messages" class="hidden">
+        <div class="section-heading">✉️ Send Message to Student</div>
+        <div class="alert alert-info" style="font-size:12.5px;margin-bottom:14px">
+          Write a message to a specific student. The message will appear on the student's Profile tab
+          when they log in to their account.
+        </div>
+        <div class="field" style="position:relative">
+          <label>Search Student (Roll No. / Name) <span class="req">*</span></label>
+          <input type="text" id="wr-msg-student-search" placeholder="Type roll number or name…"
+                 autocomplete="off"
+                 oninput="_wrMsgStudentSearch(this.value)"
+                 onfocus="_wrMsgStudentShow(true)"
+                 onblur="_wrMsgStudentShow(false)"/>
+          <input type="hidden" id="wr-msg-student"/>
+          <div id="wr-msg-student-dropdown"
+               style="position:absolute;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--gray-200);border-radius:0 0 var(--radius-md) var(--radius-md);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;display:none"></div>
+          <div id="wr-msg-student-pill" style="margin-top:6px;display:none"></div>
+        </div>
+        <div class="field">
+          <label>Subject <span class="req">*</span></label>
+          <input type="text" id="wr-msg-subject" placeholder="Brief subject of the message" maxlength="200"/>
+        </div>
+        <div class="field">
+          <label>Message <span class="req">*</span></label>
+          <textarea id="wr-msg-body" rows="4" placeholder="Type your message to the student…" maxlength="2000"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="wrSendMessage()" id="wr-send-msg-btn">✉️ Send Message</button>
+        <div id="wr-send-msg-result" style="margin-top:10px"></div>
+
+        <hr class="divider"/>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="section-heading" style="margin:0">📤 Sent Messages</div>
+          <button class="btn btn-secondary btn-sm" onclick="loadWardenSentMessages()" style="font-size:11px">🔄 Refresh</button>
+        </div>
+        <div id="wr-sent-messages-list"><p style="color:var(--gray-400);font-size:13px">Loading…</p></div>
+      </div>
+
+      <!-- Notices Tab (v25.5) -->
+      <div id="wr-tab-notices" class="hidden">
+        <div class="section-heading">📢 Attach New Notice</div>
+        <div class="alert alert-info" style="font-size:12.5px;margin-bottom:14px">
+          Notices attached here are displayed publicly on the home page for all visitors and students.
+          Use this for official announcements, circulars, and important notifications.
+        </div>
+        <div class="field">
+          <label>Notice Date <span class="req">*</span></label>
+          <input type="date" id="wr-notice-date"/>
+          <div class="hint">Date shown on the notice (defaults to today)</div>
+        </div>
+        <div class="field">
+          <label>Notice Title <span class="req">*</span></label>
+          <input type="text" id="wr-notice-title" placeholder="e.g. Hostel Reopening Notice for Odd 2025 Session" maxlength="200"/>
+        </div>
+        <div class="field">
+          <label>Notice Body / Description <span class="req">*</span></label>
+          <textarea id="wr-notice-body" rows="4" placeholder="Enter the notice content…" maxlength="2000"></textarea>
+        </div>
+        <div class="field">
+          <label>Attachment Link (optional)</label>
+          <input type="url" id="wr-notice-url" placeholder="https://drive.google.com/... (Drive link to PDF/document)"/>
+          <div class="hint">If you have an attached PDF/document, paste its shareable Drive URL here</div>
+        </div>
+        <button class="btn btn-primary" onclick="wrAddNotice()" id="wr-add-notice-btn" style="margin-top:6px">📌 Attach Notice</button>
+        <div id="wr-add-notice-result" style="margin-top:10px"></div>
+
+        <hr class="divider"/>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="section-heading" style="margin:0">📋 Existing Notices</div>
+          <button class="btn btn-secondary btn-sm" onclick="loadWardenNotices()" style="font-size:11px">🔄 Refresh List</button>
+        </div>
+        <div id="wr-notices-list"><p style="color:var(--gray-400);font-size:13px">Loading…</p></div>
+      </div>
+
+
       <div id="wr-tab-debar" class="hidden">
         <div class="card" style="border-left:4px solid var(--danger);background:var(--danger-bg);margin-bottom:16px">
           <div style="font-weight:700;color:var(--danger);font-size:14px;margin-bottom:4px">⚠ Debarment Notice</div>
@@ -2171,7 +2275,8 @@
         </button>
         <button class="tab-btn" onclick="admTab('grievances')">
           Grievance Intake <span class="tab-badge" id="adm-grv-badge" style="display:none">0</span>
-        </button>
+        </button>        <button class="tab-btn" onclick="admTab('messages')" id="adm-tab-btn-messages">✉️ Messages</button>
+
         <button class="tab-btn" onclick="admTab('nodues')">No Dues Pre-Check</button>
       </div>
 
@@ -2247,7 +2352,45 @@
           <button class="btn btn-secondary btn-sm" onclick="admFilterGrievances('resolved')"  id="adm-grv-f-resolved"  style="font-size:11px">✅ Resolved</button>
         </div>
         <div id="adm-grievance-list"><p style="color:var(--gray-400);font-size:13px"><span class="spinner spinner-dark"></span> Loading…</p></div>
+      </div>      <!-- Admin Messages Tab (v25.5) -->
+      <div id="adm-tab-messages" class="hidden">
+        <div class="section-heading">✉️ Send Message to Student</div>
+        <div class="alert alert-info" style="font-size:12.5px;margin-bottom:14px">
+          Write a message to a specific student. The message will appear on the student's Profile tab
+          when they log in to their account.
+        </div>
+        <div class="field" style="position:relative">
+          <label>Search Student (Roll No. / Name) <span class="req">*</span></label>
+          <input type="text" id="adm-msg-student-search" placeholder="Type roll number or name…"
+                 autocomplete="off"
+                 oninput="_admMsgStudentSearch(this.value)"
+                 onfocus="_admMsgStudentShow(true)"
+                 onblur="_admMsgStudentShow(false)"/>
+          <input type="hidden" id="adm-msg-student"/>
+          <div id="adm-msg-student-dropdown"
+               style="position:absolute;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--gray-200);border-radius:0 0 var(--radius-md) var(--radius-md);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;display:none"></div>
+          <div id="adm-msg-student-pill" style="margin-top:6px;display:none"></div>
+        </div>
+        <div class="field">
+          <label>Subject <span class="req">*</span></label>
+          <input type="text" id="adm-msg-subject" placeholder="Brief subject of the message" maxlength="200"/>
+        </div>
+        <div class="field">
+          <label>Message <span class="req">*</span></label>
+          <textarea id="adm-msg-body" rows="4" placeholder="Type your message to the student…" maxlength="2000"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="admSendMessage()" id="adm-send-msg-btn">✉️ Send Message</button>
+        <div id="adm-send-msg-result" style="margin-top:10px"></div>
+
+        <hr class="divider"/>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="section-heading" style="margin:0">📤 Sent Messages</div>
+          <button class="btn btn-secondary btn-sm" onclick="loadAdmSentMessages()" style="font-size:11px">🔄 Refresh</button>
+        </div>
+        <div id="adm-sent-messages-list"><p style="color:var(--gray-400);font-size:13px">Loading…</p></div>
       </div>
+
+
 
       <!-- ── NO DUES PRE-CHECK TAB ── -->
       <div id="adm-tab-nodues" class="hidden">
@@ -2508,7 +2651,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v25.4';
+const EXPECTED_BACKEND_VERSION = 'v25.6';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -3038,6 +3181,30 @@ function feeLabel(semester, paymentType) {
 // ══════════════════════════════════════════════════════════
 // ROLL NUMBER PREVIEW
 // ══════════════════════════════════════════════════════════
+// v25.5 Bug 1: Sanitize roll-number input fields — transliterate Hindi/Bengali/
+// Persian digits to ASCII 0-9 and strip any other non-ASCII characters so the
+// roll number is always stored in English. Done live on every keystroke so the
+// student sees the cleaned value immediately.
+function _sanitizeEnglishInput(el) {
+  if(!el) return;
+  const start = el.selectionStart;
+  const len = el.value.length;
+  let s = el.value;
+  const dev = ['\u0966','\u0967','\u0968','\u0969','\u096A','\u096B','\u096C','\u096D','\u096E','\u096F']; // 0-9 Devanagari
+  const ben = ['\u09E6','\u09E7','\u09E8','\u09E9','\u09EA','\u09EB','\u09EC','\u09ED','\u09EE','\u09EF']; // 0-9 Bengali
+  const far = ['\u06F0','\u06F1','\u06F2','\u06F3','\u06F4','\u06F5','\u06F6','\u06F7','\u06F8','\u06F9']; // 0-9 Persian
+  for(let i = 0; i < 10; i++) { s = s.split(dev[i]).join(String(i)); s = s.split(ben[i]).join(String(i)); s = s.split(far[i]).join(String(i)); }
+  // Strip remaining non-ASCII
+  s = s.replace(/[^\x20-\x7E]/g, '');
+  el.value = s;
+  // Try to preserve cursor position
+  try {
+    const delta = len - s.length;
+    const newPos = Math.max(0, start - delta);
+    el.setSelectionRange(newPos, newPos);
+  } catch(_) {}
+}
+
 function updateRollPreview() {
   const no  = document.getElementById('ns-roll-no')?.value.trim() || '__';
   const br  = document.getElementById('ns-roll-branch')?.value || 'CSE';
@@ -3904,14 +4071,14 @@ function renderStudentProfile() {
     // Build per-record detail rows for student view
     const debarDetailRows = activeDebars.map(d => {
       const sems = (d.semesters||[]).map(v=>semLabel(v)).join(', ');
-      const orderDate = d.letterDate ? new Date(d.letterDate).toLocaleDateString('en-IN') : null;
+      const orderDate = d.letterDate ? _fmtDispDDMMYYYY(d.letterDate) : null;
       return `<div style="background:rgba(255,255,255,.6);border:1px solid #f5c6c6;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:12px">
         <div><strong style="color:var(--danger)">${sems}</strong></div>
         ${d.reason ? `<div style="color:var(--gray-700);margin-top:3px"><strong>Reason:</strong> ${d.reason}</div>` : ''}
         ${(d.letterNo||orderDate) ? `<div style="color:var(--gray-600);margin-top:3px">
           <strong>Office Order:</strong> ${d.letterNo ? `No. <strong>${d.letterNo}</strong>` : ''}${orderDate ? ` dated ${orderDate}` : ''}
         </div>` : ''}
-        <div style="color:var(--gray-500);margin-top:3px;font-size:11px">Debarred on: ${d.debarredAt ? new Date(d.debarredAt).toLocaleDateString('en-IN') : '—'}</div>
+        <div style="color:var(--gray-500);margin-top:3px;font-size:11px">Debarred on: ${d.debarredAt ? _fmtDispDDMMYYYY(d.debarredAt) : '—'}</div>
       </div>`;
     }).join('');
     const notice = document.createElement('div');
@@ -3944,7 +4111,7 @@ function renderStudentProfile() {
       ${latest ? `<div style="margin-top:8px;padding:10px 12px;background:rgba(255,255,255,.6);border:1px solid #f5c6c6;border-radius:6px">
         <div style="font-size:12px;color:var(--gray-600);margin-bottom:3px"><strong>Reason for rejection:</strong></div>
         <div style="font-size:13px;color:var(--danger);font-weight:600;line-height:1.5">${latest.reason}</div>
-        <div style="font-size:11px;margin-top:6px;color:var(--gray-600)">Rejected on: ${latest.date ? new Date(latest.date).toLocaleDateString('en-IN') : '—'}</div>
+        <div style="font-size:11px;margin-top:6px;color:var(--gray-600)">Rejected on: ${latest.date ? _fmtDispDDMMYYYY(latest.date) : '—'}</div>
       </div>` : '<div style="margin-top:6px;font-size:12px">No specific reason was provided. Please contact the Hostel Office.</div>'}
       <div style="margin-top:12px;font-size:12.5px;color:var(--gray-700);line-height:1.55">
         You can <strong>edit your application</strong> to correct the issue(s) mentioned above and re-submit it for the Warden's review.
@@ -4027,7 +4194,7 @@ function renderStudentProfile() {
     _csShowCurrentSep ? ['Current Session', _csCurrentSessionDisplay] : null,
     ['District / PIN', (s.district||'—')+' — '+( s.pin||'—')],
     ['Permanent Address', (s.address||'—')+(s.district?', '+(s.district||''):'')+(s.pin?', PIN '+(s.pin||''):'')],
-    ['Submitted', s.submittedAt ? new Date(s.submittedAt).toLocaleDateString('en-IN') : '—']
+    ['Submitted', s.submittedAt ? _fmtDispDDMMYYYY(s.submittedAt) : '—']
   ].filter(Boolean).map(([k,v])=>`<div class="info-item"><div class="key">${k}</div><div class="val">${v||'—'}</div></div>`).join('');
 
   // Pre-fill update
@@ -4681,7 +4848,7 @@ function renderOutstandingDues(s) {
   fines.forEach((f, i) => {
     if(f.revoked) return;
     const orderRef = (f.letterNo||f.letterDate)
-      ? ` · Order: ${f.letterNo||''}${f.letterDate?' dt. '+new Date(f.letterDate).toLocaleDateString('en-IN'):''}` : '';
+      ? ` · Order: ${f.letterNo||''}${f.letterDate?' dt. '+_fmtDispDDMMYYYY(f.letterDate):''}` : '';
     if(f.paid) {
       if(!f.paymentVerified) {
         items.push({
@@ -4852,7 +5019,7 @@ function renderPaymentHistory(s) {
     const groupStatus = hasRejected?'rejected':hasPending?'pending':'approved';
     const receiptNo   = items[0].receipt||'—';
     const paidAt      = items[0].paidAt;
-    const dateStr     = paidAt ? new Date(paidAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+    const dateStr     = paidAt ? _fmtDispDDMMYYYY(paidAt) : '—';
     const rejComment  = items.find(p=>p.rejectionComment)?.rejectionComment||'';
     const anyIdx      = items[0]._idx;
 
@@ -4914,9 +5081,9 @@ function renderPaymentHistory(s) {
     }
     const receipt = entry.f.paidReceiptNo||entry.f.rejectedReceiptNo||'—';
     const paidAt  = entry.f.paidAt||entry.f.rejectedPaidAt;
-    const dateStr = paidAt?new Date(paidAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    const dateStr = paidAt?_fmtDispDDMMYYYY(paidAt):'—';
     const fOrderRef = (entry.f.letterNo||entry.f.letterDate)
-      ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">Office Order: ${entry.f.letterNo||''}${entry.f.letterDate?' dt. '+new Date(entry.f.letterDate).toLocaleDateString('en-IN'):''}</div>` : '';
+      ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">Office Order: ${entry.f.letterNo||''}${entry.f.letterDate?' dt. '+_fmtDispDDMMYYYY(entry.f.letterDate):''}</div>` : '';
     return `<tr style="${entry.status==='fine-rejected'?'background:var(--danger-bg)':''}">
       <td style="font-weight:500">
         <div style="margin-bottom:4px">Receipt No. <span style="font-family:monospace">${receipt}</span></div>
@@ -5413,6 +5580,77 @@ async function issueAllotmentLetterForStudent(rollFull) {
   }
 }
 
+// v25.6: Reissue (or issue fresh) Hostel Allotment Letter PDF with current
+// accommodation details. Called from the "Update Accommodation Details" panel
+// after the warden changes room/bed/chair/table and saves.
+async function reissueAllotmentLetterForStudent(rollFull) {
+  const s = wrStudents.find(x => x.rollFull === rollFull);
+  const dl = s ? getDriveLinks(s) : {};
+  const hasExisting = !!(dl && dl.allotmentLetter);
+  const confirmMsg = hasExisting
+    ? `Reissue the Hostel Allotment Letter for ${rollFull}?\n\nThis will generate a fresh PDF with the CURRENT accommodation details (hostel, room, bed, chair, table) and overwrite the previous letter in Drive.\n\nMake sure you have clicked "Update Accommodation Details" first if you changed any fields.`
+    : `Issue a Hostel Allotment Letter for ${rollFull}?\n\nThis will generate a PDF with the current accommodation details.`;
+  if(!confirm(confirmMsg)) return;
+
+  const resEl = document.getElementById('wr-reissue-letter-result');
+  // Find the clicked button to show spinner
+  const btns = document.querySelectorAll('#wr-update-hostel button');
+  let targetBtn = null;
+  for(const b of btns) {
+    if(b.textContent.includes('Allotment Letter')) { targetBtn = b; break; }
+  }
+  if(targetBtn) {
+    targetBtn.disabled = true;
+    const orig = targetBtn.innerHTML;
+    targetBtn.innerHTML = '<span class="spinner spinner-dark"></span> Generating…';
+    try {
+      const r = await callBackend('reissueAllotmentLetter', { rollFull });
+      targetBtn.disabled = false;
+      targetBtn.innerHTML = orig;
+      if(r && r.success) {
+        toast('✅ Allotment letter ' + (hasExisting ? 'reissued' : 'issued') + ' successfully. Ref: ' + (r.refNo || ''), 'success');
+        if(resEl) resEl.innerHTML = '<div class="alert alert-success" style="font-size:12.5px">✅ Allotment Letter ' + (hasExisting ? 'reissued' : 'issued') + ' for session <strong>' + (r.sessionId || '—') + '</strong>.<br/>📄 <a href="' + r.driveUrl + '" target="_blank" style="color:var(--navy);font-weight:600">Open Allotment Letter PDF →</a></div>';
+        // Refresh student data + view
+        const rr = await callBackend('getStudent', { rollFull });
+        if(rr && rr.success && rr.student) {
+          const idx = wrStudents.findIndex(x => x.rollFull === rollFull);
+          if(idx >= 0) wrStudents[idx] = rr.student;
+        }
+        // Reopen the approve panel in view-only mode to refresh the button label
+        openApprove(rollFull, true);
+      } else {
+        const errMsg = (r && r.error) || 'Failed to generate allotment letter.';
+        toast('Failed: ' + errMsg, 'error');
+        if(resEl) resEl.innerHTML = '<div class="alert alert-danger" style="font-size:12.5px">⚠ ' + errMsg + '</div>';
+      }
+    } catch(e) {
+      if(targetBtn) { targetBtn.disabled = false; targetBtn.innerHTML = targetBtn.innerHTML.replace(/<span class="spinner[^>]*>.*?<\/span>\s*/s, ''); }
+      toast('Error: ' + (e.message || 'Unknown'), 'error');
+      if(resEl) resEl.innerHTML = '<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ' + (e.message || 'Unknown') + '</div>';
+    }
+  } else {
+    // Fallback: no button found, just call backend
+    try {
+      const r = await callBackend('reissueAllotmentLetter', { rollFull });
+      if(r && r.success) {
+        toast('✅ Allotment letter ' + (hasExisting ? 'reissued' : 'issued') + ' successfully.', 'success');
+        if(resEl) resEl.innerHTML = '<div class="alert alert-success" style="font-size:12.5px">✅ Allotment Letter generated. 📄 <a href="' + r.driveUrl + '" target="_blank" style="color:var(--navy);font-weight:600">Open PDF →</a></div>';
+        const rr = await callBackend('getStudent', { rollFull });
+        if(rr && rr.success && rr.student) {
+          const idx = wrStudents.findIndex(x => x.rollFull === rollFull);
+          if(idx >= 0) wrStudents[idx] = rr.student;
+        }
+        openApprove(rollFull, true);
+      } else {
+        toast('Failed: ' + ((r && r.error) || 'Unknown'), 'error');
+        if(resEl) resEl.innerHTML = '<div class="alert alert-danger" style="font-size:12.5px">⚠ ' + ((r && r.error) || 'Unknown') + '</div>';
+      }
+    } catch(e) {
+      toast('Error: ' + (e.message || 'Unknown'), 'error');
+    }
+  }
+}
+
 async function wardenUnlockStudentAccount() {
   const email = getVal('wr-unlock-email');
   const masterKey = document.getElementById('wr-unlock-masterkey')?.value||'';
@@ -5468,6 +5706,8 @@ function csTab(name) {
   // the student opens the Profile tab so any newly reissued documents (HDN, allotment
   // letter) show up without the student needing to log out and back in.
   if(name === 'info' && csStudent) {
+    loadStudentMessages();
+
     callBackend('getStudent', {rollFull: csStudent.rollFull}).then(rd => {
       if(rd && rd.success && rd.student) {
         csStudent = rd.student;
@@ -6000,13 +6240,13 @@ function wrFilterStudents() {
 }
 
 function wrTab(name) {
-  ['applications','students','fines','leaves','grievances','nodues','letters','unlock','datesettings','reports','debar'].forEach(t=>{
+  ['applications','students','fines','leaves','grievances','nodues','letters','notices','messages','unlock','datesettings','reports','debar'].forEach(t=>{
     const el = document.getElementById('wr-tab-'+t);
     if(el) el.classList.toggle('hidden', t!==name);
     if(el) el.style.display = (t!==name) ? 'none' : '';
   });
   document.querySelectorAll('#wr-dashboard .tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active', ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','debar'][i]===name);
+    b.classList.toggle('active', ['applications','students','fines','leaves','nodues','letters','notices','messages','grievances','unlock','datesettings','reports','debar'][i]===name);
   });
   // Reload data for each tab switch
   if(name==='applications') {
@@ -6023,6 +6263,8 @@ function wrTab(name) {
   else if(name==='letters') renderWardenLetters();
   else if(name==='datesettings') loadDateWindows();
   else if(name==='reports') { /* data loaded on demand via Load buttons — Report 3 shares getDebars cache */ }
+  else if(name==='notices') { loadWardenNotices(); }
+  else if(name==='messages') { loadWardenSentMessages(); }
   else if(name==='debar') { loadDebarTab(); }
   else if(name==='unlock') {
     document.getElementById('wr-unlock-email').value='';
@@ -6267,9 +6509,24 @@ async function openApprove(rollFull, viewOnly=false) {
       hdnBtnHtml = '<button class="btn btn-secondary" onclick="issueHDNForStudent(\'' + s.rollFull + '\')" style="font-size:12px" title="Issue / Re-issue Hostel Fee Demand Notice for current session">📋 Issue HDN</button>';
     }
 
+    // v25.6: Reissue Allotment Letter button — shown for approved/pending/alumni students
+    // who already have an allotment letter OR have hostelInfo set. Lets the warden
+    // regenerate the Hostel Allotment Letter PDF with the (possibly updated)
+    // accommodation details.
+    let reissueLetterBtnHtml = '';
+    if(['approved','pending','alumni'].includes(s.status) && hi.hostel && hi.roomNo) {
+      const dl = getDriveLinks(s);
+      const hasExistingLetter = !!(dl && dl.allotmentLetter);
+      reissueLetterBtnHtml = '<button class="btn btn-gold" onclick="reissueAllotmentLetterForStudent(\'' + s.rollFull + '\')" style="font-size:12px" title="Generate a fresh Hostel Allotment Letter PDF with the current accommodation details">' + (hasExistingLetter ? '🔄 Reissue Allotment Letter' : '📄 Issue Allotment Letter') + '</button>';
+    }
+
     updateDiv.innerHTML = `
       <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
       <div class="section-heading">Update Accommodation Details</div>
+      <div class="alert alert-info" style="font-size:12px;margin-bottom:12px">
+        💡 After changing the room / bed / chair / table, click <strong>Update</strong> first to save,
+        then click <strong>Reissue Allotment Letter</strong> to generate a fresh PDF with the new details.
+      </div>
       <div class="form-row">
         <div class="field">
           <label>Hostel Block</label>
@@ -6301,9 +6558,11 @@ async function openApprove(rollFull, viewOnly=false) {
         <button class="btn btn-primary" id="wr-upd-hostel-btn" onclick="updateHostelInfo('${s.rollFull}')">
           💾 Update Accommodation Details
         </button>
+        ${reissueLetterBtnHtml}
         ${allotLetterBtnHtml}
         ${hdnBtnHtml}
-      </div>`;
+      </div>
+      <div id="wr-reissue-letter-result" style="margin-top:10px"></div>`;
     // Append after wr-allot-form
     document.getElementById('wr-allot-form').after(updateDiv);
   }
@@ -6451,7 +6710,7 @@ async function openApprove(rollFull, viewOnly=false) {
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
               <div style="flex:1">
                 <div style="font-size:13px;font-weight:600">${typeLabel} — ₹${p.amount||4500}</div>
-                <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${p.receipt||'—'}</strong> · ${p.paidAt?new Date(p.paidAt).toLocaleDateString('en-IN'):'—'} ${p.note?'· '+p.note:''}</div>
+                <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${p.receipt||'—'}</strong> · ${p.paidAt?_fmtDispDDMMYYYY(p.paidAt):'—'} ${p.note?'· '+p.note:''}</div>
                 ${isRejected && p.rejectionComment ? `<div style="font-size:11px;color:var(--danger);margin-top:3px;font-weight:600">✗ Admin rejected: ${p.rejectionComment}</div>` : ''}
               </div>
               <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -6503,7 +6762,7 @@ async function openApprove(rollFull, viewOnly=false) {
               <div style="flex:1">
                 <div style="font-size:13px;font-weight:600;color:var(--warning)">₹${f.amount} — ${f.reason}</div>
                 <div style="font-size:11px;color:var(--gray-600)">${f.form||''} · Imposed: ${f.date||'—'}</div>
-                <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${f.paidReceiptNo||'—'}</strong> · Paid: ${f.paidAt?new Date(f.paidAt).toLocaleDateString('en-IN'):'—'}</div>
+                <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${f.paidReceiptNo||'—'}</strong> · Paid: ${f.paidAt?_fmtDispDDMMYYYY(f.paidAt):'—'}</div>
                 <div id="fine-wv-img-${safeRoll}-${f.idx}" style="margin-top:6px">
                   <button class="btn btn-secondary btn-sm" style="font-size:11px"
                     onclick="loadFineReceiptImage('${s.rollFull}',${f.idx},'fine-wv-img-${safeRoll}-${f.idx}')">
@@ -6749,7 +7008,7 @@ function _dwWindowStatus(start, end) {
 
 function _fmtDate(iso) {
   if(!iso) return '—';
-  try { return new Date(iso+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); } catch { return iso; }
+  try { return _fmtDispDDMMYYYY(iso+'T00:00:00'); } catch { return iso; }
 }
 
 async function loadDateWindows() {
@@ -7389,7 +7648,7 @@ function renderFineVerifyList() {
             <div style="flex:1">
               <div style="font-size:13px;font-weight:600">₹${f.amount} — ${f.reason}</div>
               <div style="font-size:11px;color:var(--gray-600)">${f.form} · Imposed: ${f.date}</div>
-              <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${f.paidReceiptNo||'—'}</strong> · Paid: ${f.paidAt?new Date(f.paidAt).toLocaleDateString('en-IN'):'—'}</div>
+              <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${f.paidReceiptNo||'—'}</strong> · Paid: ${f.paidAt?_fmtDispDDMMYYYY(f.paidAt):'—'}</div>
               <div id="fine-pay-img-${s.rollFull.replace(/\//g,'_')}-${f.idx}" style="margin-top:6px">
                 <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="loadFineReceiptImage('${s.rollFull}',${f.idx},'fine-pay-img-${s.rollFull.replace(/\//g,'_')}-${f.idx}')">
                   🖼 View Receipt
@@ -7478,25 +7737,21 @@ async function approvePaymentWarden(rollFull, paymentIndex) {
 }
 
 // ── FINES ──
+// v25.5 Bug 2: Replace dropdown with searchable input for both impose + revoke.
 function populateFineStuDropdown() {
-  const sel = document.getElementById('wr-fine-student');
-  sel.innerHTML = '<option value="">— Select approved student —</option>';
-  wrStudents.filter(s=>s.status==='approved').forEach(s=>{
-    const o = document.createElement('option'); o.value=s.rollFull; o.text=`${s.name} (${s.rollFull})`; sel.add(o);
-  });
+  // No-op kept for backward compatibility — the searchable input loads results
+  // on demand via _wrFineStudentSearch(). Pre-populate is no longer needed.
 }
 
 function populateRevokeStuDropdown() {
-  const sel = document.getElementById('wr-revoke-student');
-  sel.innerHTML = '<option value="">— Select student —</option>';
-  wrStudents.filter(s=>s.status==='approved' && Array.isArray(s.fines) && s.fines.some(f=>!f.revoked && !(f.paid && f.paymentVerified))).forEach(s=>{
-    const o = document.createElement('option'); o.value=s.rollFull; o.text=`${s.name} (${s.rollFull})`; sel.add(o);
-  });
+  // No-op kept for backward compatibility — the searchable input loads results
+  // on demand via _wrRevokeStudentSearch(). Pre-populate is no longer needed.
 }
 
 function populateFinesList() {
   const roll = document.getElementById('wr-revoke-student')?.value;
   const sel  = document.getElementById('wr-revoke-fine');
+  if(!sel) return;
   sel.innerHTML = '<option value="">— Select fine —</option>';
   if(!roll) return;
   const s = wrStudents.find(x=>x.rollFull===roll);
@@ -7504,9 +7759,173 @@ function populateFinesList() {
   s.fines.forEach((f,i)=>{
     if(f.revoked) return;
     if(f.paid && f.paymentVerified) return; // already paid & verified — cannot be revoked
-    const o = document.createElement('option'); o.value=i; o.text=`₹${f.amount} — ${f.reason} (${f.date})`; sel.add(o);
+    const o = document.createElement('option'); o.value=i; o.text=`₹${f.amount} — ${f.reason} (${_fmtDispDDMMYYYY(f.date)})`; sel.add(o);
   });
 }
+
+// v25.5 Bug 2: searchable student picker for the IMPOSE FINE form
+function _wrFineStudentAll() {
+  return wrStudents.filter(s => s.status === 'approved');
+}
+function _wrFineStudentSearch(q) {
+  const dd = document.getElementById('wr-fine-student-dropdown');
+  if(!dd) return;
+  // Clear previous selection when user types
+  document.getElementById('wr-fine-student').value = '';
+  document.getElementById('wr-fine-student-pill').style.display = 'none';
+  const query = (q||'').toLowerCase().trim();
+  if(!query) { dd.style.display='none'; dd.innerHTML=''; return; }
+  const matches = _wrFineStudentAll()
+    .filter(s => (s.name||'').toLowerCase().includes(query) || (s.rollFull||'').toLowerCase().includes(query))
+    .slice(0, 30);
+  if(!matches.length) {
+    dd.innerHTML = '<div style="padding:10px 12px;color:var(--gray-500);font-size:13px">No matching students</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(s =>
+    `<div onmousedown="_wrFineStudentPick('${s.rollFull.replace(/'/g,"\\'")}')"
+         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px"
+         onmouseover="this.style.background='#f0f4f8'"
+         onmouseout="this.style.background='#fff'">
+       <strong>${s.name}</strong> <span style="color:var(--gray-600)">(${s.rollFull})</span>
+     </div>`).join('');
+  dd.style.display = 'block';
+}
+function _wrFineStudentShow(show) {
+  // Small delay so click events fire before blur hides the dropdown
+  setTimeout(() => {
+    const dd = document.getElementById('wr-fine-student-dropdown');
+    if(dd) dd.style.display = show ? 'block' : 'none';
+  }, 150);
+}
+function _wrFineStudentPick(rollFull) {
+  document.getElementById('wr-fine-student').value = rollFull;
+  const s = wrStudents.find(x => x.rollFull === rollFull);
+  const pill = document.getElementById('wr-fine-student-pill');
+  const search = document.getElementById('wr-fine-student-search');
+  if(s) {
+    search.value = s.name + ' (' + s.rollFull + ')';
+    pill.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#e8f0fb;color:var(--navy);border-radius:14px;font-size:12px;font-weight:600">✓ ${s.name} · ${s.rollFull}<span style="cursor:pointer;color:var(--gray-500)" onclick="_wrFineStudentClear()">✕</span></span>`;
+    pill.style.display = 'block';
+  }
+  document.getElementById('wr-fine-student-dropdown').style.display = 'none';
+  clearErr('wr-fine-student');
+}
+function _wrFineStudentClear() {
+  document.getElementById('wr-fine-student').value = '';
+  document.getElementById('wr-fine-student-search').value = '';
+  document.getElementById('wr-fine-student-pill').style.display = 'none';
+  document.getElementById('wr-fine-student-dropdown').style.display = 'none';
+}
+
+// v25.5 Bug 2: searchable student picker for the REVOKE FINE form
+function _wrRevokeStudentAll() {
+  return wrStudents.filter(s => s.status === 'approved' && Array.isArray(s.fines) && s.fines.some(f => !f.revoked && !(f.paid && f.paymentVerified)));
+}
+function _wrRevokeStudentSearch(q) {
+  const dd = document.getElementById('wr-revoke-student-dropdown');
+  if(!dd) return;
+  document.getElementById('wr-revoke-student').value = '';
+  document.getElementById('wr-revoke-student-pill').style.display = 'none';
+  // Clear the fines dropdown too
+  const fineSel = document.getElementById('wr-revoke-fine');
+  if(fineSel) fineSel.innerHTML = '<option value="">— Select fine —</option>';
+  const query = (q||'').toLowerCase().trim();
+  if(!query) { dd.style.display='none'; dd.innerHTML=''; return; }
+  const matches = _wrRevokeStudentAll()
+    .filter(s => (s.name||'').toLowerCase().includes(query) || (s.rollFull||'').toLowerCase().includes(query))
+    .slice(0, 30);
+  if(!matches.length) {
+    dd.innerHTML = '<div style="padding:10px 12px;color:var(--gray-500);font-size:13px">No matching students with active fines</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(s =>
+    `<div onmousedown="_wrRevokeStudentPick('${s.rollFull.replace(/'/g,"\\'")}')"
+         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px"
+         onmouseover="this.style.background='#f0f4f8'"
+         onmouseout="this.style.background='#fff'">
+       <strong>${s.name}</strong> <span style="color:var(--gray-600)">(${s.rollFull})</span>
+     </div>`).join('');
+  dd.style.display = 'block';
+}
+function _wrRevokeStudentShow(show) {
+  setTimeout(() => {
+    const dd = document.getElementById('wr-revoke-student-dropdown');
+    if(dd) dd.style.display = show ? 'block' : 'none';
+  }, 150);
+}
+function _wrRevokeStudentPick(rollFull) {
+  document.getElementById('wr-revoke-student').value = rollFull;
+  const s = wrStudents.find(x => x.rollFull === rollFull);
+  const pill = document.getElementById('wr-revoke-student-pill');
+  const search = document.getElementById('wr-revoke-student-search');
+  if(s) {
+    search.value = s.name + ' (' + s.rollFull + ')';
+    pill.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#e8f0fb;color:var(--navy);border-radius:14px;font-size:12px;font-weight:600">✓ ${s.name} · ${s.rollFull}<span style="cursor:pointer;color:var(--gray-500)" onclick="_wrRevokeStudentClear()">✕</span></span>`;
+    pill.style.display = 'block';
+  }
+  document.getElementById('wr-revoke-student-dropdown').style.display = 'none';
+  populateFinesList();
+  clearErr('wr-revoke-student');
+}
+function _wrRevokeStudentClear() {
+  document.getElementById('wr-revoke-student').value = '';
+  document.getElementById('wr-revoke-student-search').value = '';
+  document.getElementById('wr-revoke-student-pill').style.display = 'none';
+  document.getElementById('wr-revoke-student-dropdown').style.display = 'none';
+  const fineSel = document.getElementById('wr-revoke-fine');
+  if(fineSel) fineSel.innerHTML = '<option value="">— Select fine —</option>';
+}
+
+// v25.5 Bug 3: Format any ISO/date string to DD/MM/YYYY for display.
+function _fmtDispDDMMYYYY(input) {
+  if(!input) return '—';
+  let y, m, d;
+  if(input instanceof Date) {
+    y = input.getFullYear(); m = input.getMonth()+1; d = input.getDate();
+  } else {
+    const s = String(input).trim();
+    // Already DD/MM/YYYY?
+    if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return s;
+    // YYYY-MM-DD
+    const parts = s.slice(0,10).split('-');
+    if(parts.length === 3) {
+      y = parseInt(parts[0],10); m = parseInt(parts[1],10); d = parseInt(parts[2],10);
+    } else {
+      // Try Date constructor
+      const dt = new Date(s);
+      if(!isNaN(dt.getTime())) { y = dt.getFullYear(); m = dt.getMonth()+1; d = dt.getDate(); }
+      else return s;
+    }
+  }
+  return (d<10?'0':'') + d + '/' + (m<10?'0':'') + m + '/' + y;
+}
+
+// v25.5 Bug 3: Format any ISO/date as "DD Month YYYY" (long form) for PDFs & displays.
+function _fmtDispLong(input) {
+  if(!input) return '—';
+  let y, m, d;
+  if(input instanceof Date) {
+    y = input.getFullYear(); m = input.getMonth()+1; d = input.getDate();
+  } else {
+    const s = String(input).trim();
+    const parts = s.slice(0,10).split('-');
+    if(parts.length === 3) {
+      y = parseInt(parts[0],10); m = parseInt(parts[1],10); d = parseInt(parts[2],10);
+    } else if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+      const p = s.split('/'); d = parseInt(p[0],10); m = parseInt(p[1],10); y = parseInt(p[2],10);
+    } else {
+      const dt = new Date(s);
+      if(!isNaN(dt.getTime())) { y = dt.getFullYear(); m = dt.getMonth()+1; d = dt.getDate(); }
+      else return s;
+    }
+  }
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return (d<10?'0':'') + d + ' ' + months[m-1] + ' ' + y;
+}
+
 
 async function imposeFine() {
   const roll   = document.getElementById('wr-fine-student')?.value;
@@ -7540,6 +7959,8 @@ async function imposeFine() {
     const flnEl=document.getElementById('wr-fine-letter-no'); if(flnEl) flnEl.value='';
     const fldEl=document.getElementById('wr-fine-letter-date'); if(fldEl) fldEl.value='';
     setVal('wr-fine-student','');
+    // v25.5 Bug 2: Clear searchable input too
+    _wrFineStudentClear();
     // FIX: refresh only this student from server, update local cache
     const sfr = await callBackend('getStudent',{rollFull:roll});
     if(sfr.success && sfr.student) {
@@ -7548,8 +7969,6 @@ async function imposeFine() {
     }
     renderWardenStats();
     renderFineVerifyList();
-    populateFineStuDropdown();
-    populateRevokeStuDropdown();
   } else {
     toast('Failed: '+(r.error||''), 'error');
   }
@@ -7576,12 +7995,14 @@ async function revokeFine() {
   if(r.success) {
     toast('Fine revoked successfully.', 'success');
     setVal('wr-revoke-student',''); setVal('wr-revoke-fine','');
+    // v25.5 Bug 2: Clear searchable input too
+    _wrRevokeStudentClear();
     const rlnEl=document.getElementById('wr-revoke-letter-no'); if(rlnEl) rlnEl.value='';
     const rldEl=document.getElementById('wr-revoke-letter-date'); if(rldEl) rldEl.value='';
     // FIX: refresh only this student
     const rvr = await callBackend('getStudent',{rollFull:roll});
     if(rvr.success&&rvr.student){const ri=wrStudents.findIndex(x=>x.rollFull===roll);if(ri>=0)wrStudents[ri]=rvr.student;}
-    renderWardenStats();renderFineVerifyList();populateRevokeStuDropdown();populateFineStuDropdown();
+    renderWardenStats();renderFineVerifyList();
   } else {
     toast('Failed: '+(r.error||''), 'error');
   }
@@ -7656,7 +8077,7 @@ function renderNoDuesResult(s) {
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(26,107,60,.2)">
           <div style="font-size:12px;font-weight:600;color:var(--gray-800);margin-bottom:8px">💰 Caution Money (₹1,500 — Refundable Deposit)</div>
           ${dl.cautionRefunded
-            ? `<span style="color:var(--success);font-weight:600;font-size:13px">✅ Caution money refunded on ${dl.cautionRefundedAt ? new Date(dl.cautionRefundedAt).toLocaleDateString('en-IN') : '—'}</span>${dl.cautionRefundNote ? `<div style="font-size:12px;color:var(--gray-600);margin-top:3px">Note: ${dl.cautionRefundNote}</div>` : ''}`
+            ? `<span style="color:var(--success);font-weight:600;font-size:13px">✅ Caution money refunded on ${dl.cautionRefundedAt ? _fmtDispDDMMYYYY(dl.cautionRefundedAt) : '—'}</span>${dl.cautionRefundNote ? `<div style="font-size:12px;color:var(--gray-600);margin-top:3px">Note: ${dl.cautionRefundNote}</div>` : ''}`
             : `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <span style="font-size:12px;color:var(--warning)">⏳ Not yet marked as refunded</span>
                 <button class="btn btn-success btn-sm" onclick="markCautionRefunded('${s.rollFull}','${s.name}')" style="font-size:12px">✅ Mark Caution Refunded</button>
@@ -8315,7 +8736,7 @@ async function loadMyGrievances() {
     const isWithdrawn = g.status === 'withdrawn';
     const cardOpacity = (isResolved || isWithdrawn) ? 'opacity:0.75;' : '';
     const replyHtml = g.wardenReply ? `<div style="border-left:3px solid var(--navy);padding:8px 12px;background:var(--info-bg);border-radius:0 var(--radius-sm) var(--radius-sm) 0;font-size:13px;margin-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:4px">WARDEN'S REPLY · ${g.repliedAt ? new Date(g.repliedAt).toLocaleDateString('en-IN') : ''}</div>
+        <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:4px">WARDEN'S REPLY · ${g.repliedAt ? _fmtDispDDMMYYYY(g.repliedAt) : ''}</div>
         ${g.wardenReply}
       </div>` : '';
     const withdrawBtn = canWithdraw ? `<button class="btn btn-secondary btn-sm"
@@ -8326,7 +8747,7 @@ async function loadMyGrievances() {
         <div>
           <span style="font-size:11px;color:var(--gray-400);font-weight:600;text-transform:uppercase;letter-spacing:.3px">${g.grievanceId}</span>
           <div style="font-weight:600;font-size:14px;color:var(--navy);margin-top:2px">${g.subject}</div>
-          <div style="font-size:12px;color:var(--gray-600);margin-top:2px">📁 ${g.category} &nbsp;·&nbsp; ${g.submittedAt ? new Date(g.submittedAt).toLocaleDateString('en-IN') : ''}</div>
+          <div style="font-size:12px;color:var(--gray-600);margin-top:2px">📁 ${g.category} &nbsp;·&nbsp; ${g.submittedAt ? _fmtDispDDMMYYYY(g.submittedAt) : ''}</div>
         </div>
         <div>${statusBadge(g.status)}</div>
       </div>
@@ -8450,7 +8871,7 @@ function renderWardenGrievances() {
             <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
               <span style="font-weight:700;font-size:12px;color:var(--gray-800)">${e.status||'—'}</span>
               <span style="font-size:11px;color:${sevColour[e.severity]||'var(--gray-600)'}">· ${e.severity||''} priority</span>
-              <span style="font-size:11px;color:var(--gray-400);margin-left:auto">${e.at ? new Date(e.at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : ''}</span>
+              <span style="font-size:11px;color:var(--gray-400);margin-left:auto">${e.at ? _fmtDispDDMMYYYY(e.at) : ''}</span>
             </div>
             ${e.note ? `<div style="font-size:12px;color:var(--gray-700);margin-top:4px">${e.note}</div>` : ''}
           </div>`).join('');
@@ -8463,7 +8884,7 @@ function renderWardenGrievances() {
     } catch(e) {}
 
     const prevReplyHtml = g.wardenReply ? `<div style="border-left:3px solid var(--success);padding:8px 12px;background:var(--success-bg);border-radius:0 var(--radius-sm) var(--radius-sm) 0;font-size:13px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:600;color:var(--success);margin-bottom:4px">YOUR PREVIOUS REPLY · ${g.repliedAt ? new Date(g.repliedAt).toLocaleDateString('en-IN') : ''}</div>
+        <div style="font-size:11px;font-weight:600;color:var(--success);margin-bottom:4px">YOUR PREVIOUS REPLY · ${g.repliedAt ? _fmtDispDDMMYYYY(g.repliedAt) : ''}</div>
         ${g.wardenReply}
       </div>` : '';
     const pBtnStyle   = g.status==='pending'   ? 'background:var(--warning);color:#fff;'  : 'background:#fff;border-color:var(--warning);color:var(--warning);';
@@ -8478,7 +8899,7 @@ function renderWardenGrievances() {
             👤 <strong>${g.studentName}</strong> · ${g.rollFull}
             &nbsp;|&nbsp; 🏠 ${g.hostel || '—'} Room ${g.roomNo || '—'}
             &nbsp;|&nbsp; 📁 ${g.category}
-            &nbsp;|&nbsp; ${g.submittedAt ? new Date(g.submittedAt).toLocaleDateString('en-IN') : ''}
+            &nbsp;|&nbsp; ${g.submittedAt ? _fmtDispDDMMYYYY(g.submittedAt) : ''}
           </div>
         </div>
         <div>${statusBadgeHtml}</div>
@@ -9220,17 +9641,18 @@ function admRenderStats() {
 }
 
 function admTab(name) {
-  ['payments','allotment','unlock','leaves','grievances','nodues'].forEach(t=>{
+  ['payments','allotment','unlock','leaves','grievances','messages','nodues'].forEach(t=>{
     const el = document.getElementById('adm-tab-'+t);
     if(el) el.classList.toggle('hidden', t!==name);
   });
   document.querySelectorAll('#adm-dashboard .tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active', ['payments','allotment','unlock','leaves','grievances','nodues'][i]===name);
+    b.classList.toggle('active', ['payments','allotment','unlock','leaves','grievances','messages','nodues'][i]===name);
   });
   if(name==='payments') admRenderPayList();
   else if(name==='allotment') admRenderAllStudents();
   else if(name==='leaves') admRenderLeaves();
   else if(name==='grievances') { admFilterGrievances('all'); }
+  else if(name==='messages') { loadAdmSentMessages(); }
   else if(name==='unlock') {
     document.getElementById('adm-unlock-email').value='';
     document.getElementById('adm-unlock-masterkey').value='';
@@ -9315,7 +9737,7 @@ function admRenderPayList() {
       const rejComment  = items.find(p=>p.rejectionComment)?.rejectionComment||'';
       const receiptNo   = items[0].receipt||'—';
       const paidAt      = items[0].paidAt;
-      const dateStr     = paidAt?new Date(paidAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+      const dateStr     = paidAt?_fmtDispDDMMYYYY(paidAt):'—';
       const totalOnReceipt = items[0].totalAmountOnReceipt
                              ? Number(items[0].totalAmountOnReceipt)
                              : items.reduce((a,p)=>a+Number(p.amount||0),0);
@@ -9484,7 +9906,7 @@ function admRenderPayList() {
                 <div style="flex:1">
                   <div style="font-size:13px;font-weight:600;color:var(--warning)">₹${f.amount} — ${f.reason}</div>
                   <div style="font-size:11px;color:var(--gray-600)">${f.form||''} · Imposed: ${f.date||'—'}</div>
-                  <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${f.paidReceiptNo||'—'}</strong> · Paid: ${f.paidAt?new Date(f.paidAt).toLocaleDateString('en-IN'):'—'}</div>
+                  <div style="font-size:11px;color:var(--gray-600)">Receipt No: <strong>${f.paidReceiptNo||'—'}</strong> · Paid: ${f.paidAt?_fmtDispDDMMYYYY(f.paidAt):'—'}</div>
                   <div id="adm-fine-img-${safeRoll}-${f.idx}" style="margin-top:6px">
                     <button class="btn btn-secondary btn-sm" style="font-size:11px"
                       onclick="loadFineReceiptImage('${s.rollFull}',${f.idx},'adm-fine-img-${safeRoll}-${f.idx}')">
@@ -9994,7 +10416,7 @@ function admFilterGrievances(status) {
         <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
           <span style="font-weight:700;color:var(--gray-800)">${e.status||'—'}</span>
           <span style="color:${sevColour[e.severity]||'var(--gray-600)'}">· ${e.severity||''} priority</span>
-          <span style="color:var(--gray-400);font-size:10px;margin-left:auto">${e.at ? new Date(e.at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : ''}</span>
+          <span style="color:var(--gray-400);font-size:10px;margin-left:auto">${e.at ? _fmtDispDDMMYYYY(e.at) : ''}</span>
         </div>
         ${e.note ? `<div style="color:var(--gray-700);margin-top:2px">${e.note}</div>` : ''}
       </div>`).join('') : '';
@@ -10061,7 +10483,7 @@ function admFilterGrievances(status) {
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-primary btn-sm" onclick="admSaveIntake('${g.grievanceId}','${sid}')">💾 Save &amp; Notify Warden</button>
           <button class="btn btn-secondary btn-sm" onclick="admToggleIntakeForm('${sid}')">Cancel</button>
-          ${lastIntake ? `<span style="font-size:11px;color:var(--gray-400);margin-left:4px">Last logged: ${new Date(lastIntake.at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span>` : ''}
+          ${lastIntake ? `<span style="font-size:11px;color:var(--gray-400);margin-left:4px">Last logged: ${_fmtDispDDMMYYYY(lastIntake.at)}</span>` : ''}
         </div>
       </div>
     </div>`;
@@ -10281,7 +10703,7 @@ function admOpenDetail(rollFull) {
         <td style="font-size:12px">${p.receipt||'—'}</td>
         <td>₹${p.amount||4500}</td>
         <td><span class="badge badge-${p.status==='approved'?'approved':p.status==='rejected'?'rejected':'pending'}">${p.status||'pending'}</span></td>
-        <td style="font-size:12px">${p.paidAt?new Date(p.paidAt).toLocaleDateString('en-IN'):''}</td>
+        <td style="font-size:12px">${p.paidAt?_fmtDispDDMMYYYY(p.paidAt):''}</td>
       </tr>`).join('')}</tbody>
     </table>`;
   }
@@ -10295,8 +10717,8 @@ function admOpenDetail(rollFull) {
       <tbody>${fines.map(f=>`<tr>
         <td style="font-size:13px">
           ${f.reason||'—'}
-          ${(f.letterNo||f.letterDate)?`<div style="font-size:11px;color:var(--gray-500)">Order: ${f.letterNo||''}${f.letterDate?' dt. '+new Date(f.letterDate).toLocaleDateString('en-IN'):''}</div>`:''}
-          ${(f.revoked&&(f.revokeLetterNo||f.revokeLetterDate))?`<div style="font-size:11px;color:var(--success)">Revoke Order: ${f.revokeLetterNo||''}${f.revokeLetterDate?' dt. '+new Date(f.revokeLetterDate).toLocaleDateString('en-IN'):''}</div>`:''}
+          ${(f.letterNo||f.letterDate)?`<div style="font-size:11px;color:var(--gray-500)">Order: ${f.letterNo||''}${f.letterDate?' dt. '+_fmtDispDDMMYYYY(f.letterDate):''}</div>`:''}
+          ${(f.revoked&&(f.revokeLetterNo||f.revokeLetterDate))?`<div style="font-size:11px;color:var(--success)">Revoke Order: ${f.revokeLetterNo||''}${f.revokeLetterDate?' dt. '+_fmtDispDDMMYYYY(f.revokeLetterDate):''}</div>`:''}
         </td>
         <td>₹${f.amount||0}</td>
         <td>${f.revoked?'<span class="badge badge-approved">Revoked</span>':f.paid?'<span class="badge badge-approved">Paid</span>':'<span class="badge badge-rejected">Outstanding</span>'}</td>
@@ -10810,7 +11232,7 @@ async function verifyAndDownload() {
     // _editingFromPublicPage is determined inside editRejectedAdmission()
     // based on the current section (download-letter), so no need to set it here.
 
-    const rejectedAtStr = r.rejectedAt ? new Date(r.rejectedAt).toLocaleDateString('en-IN') : '—';
+    const rejectedAtStr = r.rejectedAt ? _fmtDispDDMMYYYY(r.rejectedAt) : '—';
     resultDiv.innerHTML = `
       <div style="text-align:center;margin-bottom:16px">
         <div style="font-size:36px;margin-bottom:6px">⚠️</div>
@@ -10906,6 +11328,421 @@ async function verifyAndDownload() {
   document.getElementById('dl-step-result').classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+
+
+// ══════════════════════════════════════════════════════════
+// v25.5 MESSAGES (warden/admin → student)
+// ══════════════════════════════════════════════════════════
+
+// ── Warden: searchable student picker ──
+function _wrMsgStudentAll() {
+  return wrStudents.filter(s => ['approved','pending','provisional','new_pending'].includes(s.status));
+}
+function _wrMsgStudentSearch(q) {
+  const dd = document.getElementById('wr-msg-student-dropdown');
+  if(!dd) return;
+  document.getElementById('wr-msg-student').value = '';
+  document.getElementById('wr-msg-student-pill').style.display = 'none';
+  const query = (q||'').toLowerCase().trim();
+  if(!query) { dd.style.display='none'; dd.innerHTML=''; return; }
+  const matches = _wrMsgStudentAll()
+    .filter(s => (s.name||'').toLowerCase().includes(query) || (s.rollFull||'').toLowerCase().includes(query))
+    .slice(0, 30);
+  if(!matches.length) {
+    dd.innerHTML = '<div style="padding:10px 12px;color:var(--gray-500);font-size:13px">No matching students</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(s =>
+    `<div onmousedown="_wrMsgStudentPick('${s.rollFull.replace(/'/g,"\'")}')"
+         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px"
+         onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='#fff'">
+       <strong>${s.name}</strong> <span style="color:var(--gray-600)">(${s.rollFull})</span>
+       <span style="font-size:10px;color:var(--gray-500);margin-left:6px">${s.status}</span>
+     </div>`).join('');
+  dd.style.display = 'block';
+}
+function _wrMsgStudentShow(show) {
+  setTimeout(() => {
+    const dd = document.getElementById('wr-msg-student-dropdown');
+    if(dd) dd.style.display = show ? 'block' : 'none';
+  }, 150);
+}
+function _wrMsgStudentPick(rollFull) {
+  document.getElementById('wr-msg-student').value = rollFull;
+  const s = wrStudents.find(x => x.rollFull === rollFull);
+  const pill = document.getElementById('wr-msg-student-pill');
+  const search = document.getElementById('wr-msg-student-search');
+  if(s) {
+    search.value = s.name + ' (' + s.rollFull + ')';
+    pill.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#e8f0fb;color:var(--navy);border-radius:14px;font-size:12px;font-weight:600">✓ ${s.name} · ${s.rollFull}<span style="cursor:pointer;color:var(--gray-500)" onclick="_wrMsgStudentClear()">✕</span></span>`;
+    pill.style.display = 'block';
+  }
+  document.getElementById('wr-msg-student-dropdown').style.display = 'none';
+}
+function _wrMsgStudentClear() {
+  document.getElementById('wr-msg-student').value = '';
+  document.getElementById('wr-msg-student-search').value = '';
+  document.getElementById('wr-msg-student-pill').style.display = 'none';
+  document.getElementById('wr-msg-student-dropdown').style.display = 'none';
+}
+
+async function wrSendMessage() {
+  const rollFull = document.getElementById('wr-msg-student')?.value;
+  const subject = document.getElementById('wr-msg-subject')?.value.trim();
+  const body = document.getElementById('wr-msg-body')?.value.trim();
+  const resEl = document.getElementById('wr-send-msg-result');
+  const btn = document.getElementById('wr-send-msg-btn');
+  if(!rollFull) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Please select a student.</div>'; return; }
+  if(!subject) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Subject is required.</div>'; return; }
+  if(!body) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Message body is required.</div>'; return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Sending…';
+  try {
+    const r = await callBackend('sendMessageToStudent', {
+      rollFull, subject, body,
+      fromRole: 'warden',
+      fromName: 'Warden, GPM Hostel'
+    });
+    btn.disabled = false; btn.innerHTML = '✉️ Send Message';
+    if(r && r.success) {
+      toast('✅ Message sent to student.', 'success');
+      document.getElementById('wr-msg-subject').value = '';
+      document.getElementById('wr-msg-body').value = '';
+      _wrMsgStudentClear();
+      if(resEl) resEl.innerHTML = '';
+      loadWardenSentMessages();
+    } else {
+      if(resEl) resEl.innerHTML = '<div class="alert alert-danger">⚠ ' + ((r && r.error) || 'Failed to send message.') + '</div>';
+    }
+  } catch(e) {
+    btn.disabled = false; btn.innerHTML = '✉️ Send Message';
+    if(resEl) resEl.innerHTML = '<div class="alert alert-danger">⚠ Error: ' + (e.message || 'Unknown error') + '</div>';
+  }
+}
+
+async function loadWardenSentMessages() {
+  const list = document.getElementById('wr-sent-messages-list');
+  if(!list) return;
+  list.innerHTML = '<p style="color:var(--gray-400);font-size:13px"><span class="spinner spinner-dark"></span> Loading…</p>';
+  // Fetch all messages by scanning students the warden has access to.
+  // Simpler: loop through wrStudents and fetch each one's messages, then filter by fromRole='warden'.
+  // For performance, we cap to first 100 students.
+  let allSent = [];
+  const subset = wrStudents.slice(0, 200);
+  for(const s of subset) {
+    try {
+      const r = await callBackend('getMessagesForStudent', { rollFull: s.rollFull });
+      if(r && r.success && Array.isArray(r.messages)) {
+        r.messages.forEach(m => {
+          if(m.fromRole === 'warden') {
+            allSent.push({ ...m, studentName: s.name });
+          }
+        });
+      }
+    } catch(_) {}
+  }
+  allSent.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''));
+  if(!allSent.length) {
+    list.innerHTML = '<div class="alert alert-info" style="font-size:13px">No messages sent yet.</div>';
+    return;
+  }
+  list.innerHTML = allSent.slice(0, 50).map(m => `
+    <div style="border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;background:#fff">
+      <div style="font-weight:700;color:var(--navy);font-size:13px">${_esc(m.subject)}</div>
+      <div style="font-size:11px;color:var(--gray-600);margin:3px 0">To: <strong>${_esc(m.studentName)}</strong> (${_esc(m.rollFull)}) · 📅 ${_fmtDispDDMMYYYY(m.sentAt)}</div>
+      <div style="font-size:13px;color:var(--gray-700);line-height:1.5;margin-top:4px;white-space:pre-wrap">${_esc(m.body)}</div>
+    </div>`).join('');
+}
+
+// ── Admin: searchable student picker ──
+function _admMsgStudentAll() {
+  return (typeof admStudents !== 'undefined' && Array.isArray(admStudents)) ? admStudents : [];
+}
+function _admMsgStudentSearch(q) {
+  const dd = document.getElementById('adm-msg-student-dropdown');
+  if(!dd) return;
+  document.getElementById('adm-msg-student').value = '';
+  document.getElementById('adm-msg-student-pill').style.display = 'none';
+  const query = (q||'').toLowerCase().trim();
+  if(!query) { dd.style.display='none'; dd.innerHTML=''; return; }
+  const matches = _admMsgStudentAll()
+    .filter(s => (s.name||'').toLowerCase().includes(query) || (s.rollFull||'').toLowerCase().includes(query))
+    .slice(0, 30);
+  if(!matches.length) {
+    dd.innerHTML = '<div style="padding:10px 12px;color:var(--gray-500);font-size:13px">No matching students</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(s =>
+    `<div onmousedown="_admMsgStudentPick('${s.rollFull.replace(/'/g,"\'")}')"
+         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px"
+         onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='#fff'">
+       <strong>${s.name}</strong> <span style="color:var(--gray-600)">(${s.rollFull})</span>
+       <span style="font-size:10px;color:var(--gray-500);margin-left:6px">${s.status}</span>
+     </div>`).join('');
+  dd.style.display = 'block';
+}
+function _admMsgStudentShow(show) {
+  setTimeout(() => {
+    const dd = document.getElementById('adm-msg-student-dropdown');
+    if(dd) dd.style.display = show ? 'block' : 'none';
+  }, 150);
+}
+function _admMsgStudentPick(rollFull) {
+  document.getElementById('adm-msg-student').value = rollFull;
+  const s = _admMsgStudentAll().find(x => x.rollFull === rollFull);
+  const pill = document.getElementById('adm-msg-student-pill');
+  const search = document.getElementById('adm-msg-student-search');
+  if(s) {
+    search.value = s.name + ' (' + s.rollFull + ')';
+    pill.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#e8f0fb;color:var(--navy);border-radius:14px;font-size:12px;font-weight:600">✓ ${s.name} · ${s.rollFull}<span style="cursor:pointer;color:var(--gray-500)" onclick="_admMsgStudentClear()">✕</span></span>`;
+    pill.style.display = 'block';
+  }
+  document.getElementById('adm-msg-student-dropdown').style.display = 'none';
+}
+function _admMsgStudentClear() {
+  document.getElementById('adm-msg-student').value = '';
+  document.getElementById('adm-msg-student-search').value = '';
+  document.getElementById('adm-msg-student-pill').style.display = 'none';
+  document.getElementById('adm-msg-student-dropdown').style.display = 'none';
+}
+
+async function admSendMessage() {
+  const rollFull = document.getElementById('adm-msg-student')?.value;
+  const subject = document.getElementById('adm-msg-subject')?.value.trim();
+  const body = document.getElementById('adm-msg-body')?.value.trim();
+  const resEl = document.getElementById('adm-send-msg-result');
+  const btn = document.getElementById('adm-send-msg-btn');
+  if(!rollFull) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Please select a student.</div>'; return; }
+  if(!subject) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Subject is required.</div>'; return; }
+  if(!body) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Message body is required.</div>'; return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Sending…';
+  try {
+    const r = await callBackend('sendMessageToStudent', {
+      rollFull, subject, body,
+      fromRole: 'admin',
+      fromName: 'Admin Office, GPM Hostel'
+    });
+    btn.disabled = false; btn.innerHTML = '✉️ Send Message';
+    if(r && r.success) {
+      toast('✅ Message sent to student.', 'success');
+      document.getElementById('adm-msg-subject').value = '';
+      document.getElementById('adm-msg-body').value = '';
+      _admMsgStudentClear();
+      if(resEl) resEl.innerHTML = '';
+      loadAdmSentMessages();
+    } else {
+      if(resEl) resEl.innerHTML = '<div class="alert alert-danger">⚠ ' + ((r && r.error) || 'Failed to send message.') + '</div>';
+    }
+  } catch(e) {
+    btn.disabled = false; btn.innerHTML = '✉️ Send Message';
+    if(resEl) resEl.innerHTML = '<div class="alert alert-danger">⚠ Error: ' + (e.message || 'Unknown error') + '</div>';
+  }
+}
+
+async function loadAdmSentMessages() {
+  const list = document.getElementById('adm-sent-messages-list');
+  if(!list) return;
+  list.innerHTML = '<p style="color:var(--gray-400);font-size:13px"><span class="spinner spinner-dark"></span> Loading…</p>';
+  let allSent = [];
+  const subset = _admMsgStudentAll().slice(0, 200);
+  for(const s of subset) {
+    try {
+      const r = await callBackend('getMessagesForStudent', { rollFull: s.rollFull });
+      if(r && r.success && Array.isArray(r.messages)) {
+        r.messages.forEach(m => {
+          if(m.fromRole === 'admin') {
+            allSent.push({ ...m, studentName: s.name });
+          }
+        });
+      }
+    } catch(_) {}
+  }
+  allSent.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''));
+  if(!allSent.length) {
+    list.innerHTML = '<div class="alert alert-info" style="font-size:13px">No messages sent yet.</div>';
+    return;
+  }
+  list.innerHTML = allSent.slice(0, 50).map(m => `
+    <div style="border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;background:#fff">
+      <div style="font-weight:700;color:var(--navy);font-size:13px">${_esc(m.subject)}</div>
+      <div style="font-size:11px;color:var(--gray-600);margin:3px 0">To: <strong>${_esc(m.studentName)}</strong> (${_esc(m.rollFull)}) · 📅 ${_fmtDispDDMMYYYY(m.sentAt)}</div>
+      <div style="font-size:13px;color:var(--gray-700);line-height:1.5;margin-top:4px;white-space:pre-wrap">${_esc(m.body)}</div>
+    </div>`).join('');
+}
+
+// ── Student: load and display messages on Profile tab ──
+async function loadStudentMessages() {
+  const section = document.getElementById('cs-messages-section');
+  if(!section || !csStudent) { if(section) section.innerHTML = ''; return; }
+  try {
+    const r = await callBackend('getMessagesForStudent', { rollFull: csStudent.rollFull });
+    if(r && r.success && Array.isArray(r.messages) && r.messages.length) {
+      section.innerHTML = `
+        <div class="section-heading" style="color:var(--navy)">✉️ Messages for You</div>
+        <div style="margin-top:6px">
+          ${r.messages.map(m => `
+            <div style="border:1px solid var(--gray-200);border-left:4px solid ${m.fromRole==='warden'?'var(--gold)':'var(--info)'};border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;background:#fffdf5">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="flex:1">
+                  <div style="font-weight:700;color:var(--navy);font-size:14px">${_esc(m.subject)}</div>
+                  <div style="font-size:11px;color:var(--gray-600);margin:3px 0">
+                    From: <strong>${_esc(m.fromName || (m.fromRole==='warden'?'Warden':'Admin'))}</strong>
+                    · 📅 ${_fmtDispDDMMYYYY(m.sentAt)}
+                  </div>
+                  <div style="font-size:13px;color:var(--gray-700);line-height:1.5;margin-top:6px;white-space:pre-wrap">${_esc(m.body)}</div>
+                </div>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    } else {
+      section.innerHTML = '';
+    }
+  } catch(e) {
+    section.innerHTML = '';
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// v25.5 NOTICES (public home panel + warden attach tab)
+// ══════════════════════════════════════════════════════════
+let _homeNoticesCache = [];
+let _wardenNoticesCache = [];
+
+async function loadHomeNotices() {
+  try {
+    const r = await callBackend('getNotices', {});
+    if(r && r.success) {
+      _homeNoticesCache = r.notices || [];
+    } else {
+      _homeNoticesCache = [];
+    }
+  } catch(e) { _homeNoticesCache = []; }
+  renderHomeNotices();
+}
+
+function renderHomeNotices() {
+  const list = document.getElementById('home-notices-list');
+  if(!list) return;
+  if(!_homeNoticesCache.length) {
+    list.innerHTML = '<p style="color:var(--gray-400);font-size:13px;text-align:center;padding:20px 0">No notices at this time. Please check back later.</p>';
+    return;
+  }
+  list.innerHTML = _homeNoticesCache.map(n => `
+    <div style="border:1px solid var(--gray-200);border-left:4px solid var(--navy);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:10px;background:#fafbfc">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1">
+          <div style="font-weight:700;color:var(--navy);font-size:14px;margin-bottom:4px">${_esc(n.title)}</div>
+          <div style="font-size:11px;color:var(--gray-600);margin-bottom:6px">📅 ${_esc(n.dateDisplay || _fmtDispDDMMYYYY(n.dateISO))} ${n.attachedBy ? '· ' + _esc(n.attachedBy) : ''}</div>
+          ${n.body ? `<div style="font-size:13px;color:var(--gray-700);line-height:1.5;white-space:pre-wrap">${_esc(n.body)}</div>` : ''}
+          ${n.driveUrl ? `<div style="margin-top:8px"><a href="${_esc(n.driveUrl)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📎 View Attachment</a></div>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function _esc(s) {
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+async function loadWardenNotices() {
+  const list = document.getElementById('wr-notices-list');
+  if(!list) return;
+  list.innerHTML = '<p style="color:var(--gray-400);font-size:13px"><span class="spinner spinner-dark"></span> Loading notices…</p>';
+  try {
+    const r = await callBackend('getNotices', {});
+    if(r && r.success) {
+      _wardenNoticesCache = r.notices || [];
+    } else {
+      _wardenNoticesCache = [];
+    }
+  } catch(e) { _wardenNoticesCache = []; }
+  renderWardenNoticesList();
+  // Pre-fill notice date with today
+  const dateInput = document.getElementById('wr-notice-date');
+  if(dateInput && !dateInput.value) {
+    const today = new Date();
+    dateInput.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  }
+}
+
+function renderWardenNoticesList() {
+  const list = document.getElementById('wr-notices-list');
+  if(!list) return;
+  if(!_wardenNoticesCache.length) {
+    list.innerHTML = '<div class="alert alert-info" style="font-size:13px">No notices attached yet. Use the form above to attach your first notice.</div>';
+    return;
+  }
+  list.innerHTML = _wardenNoticesCache.map(n => `
+    <div style="border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:10px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1">
+          <div style="font-weight:700;color:var(--navy);font-size:14px">${_esc(n.title)}</div>
+          <div style="font-size:11px;color:var(--gray-600);margin-top:3px">📅 ${_esc(n.dateDisplay || _fmtDispDDMMYYYY(n.dateISO))} · 📌 ${_esc(n.attachedBy || 'Warden')}</div>
+          ${n.body ? `<div style="font-size:13px;color:var(--gray-700);line-height:1.5;margin-top:6px;white-space:pre-wrap">${_esc(n.body)}</div>` : ''}
+          ${n.driveUrl ? `<div style="margin-top:6px"><a href="${_esc(n.driveUrl)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📎 View Attachment</a></div>` : ''}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="wrDeleteNotice('${_esc(n.id)}')" style="font-size:11px;flex-shrink:0">🗑 Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+async function wrAddNotice() {
+  const title = document.getElementById('wr-notice-title')?.value.trim();
+  const body  = document.getElementById('wr-notice-body')?.value.trim();
+  const dateISO = document.getElementById('wr-notice-date')?.value;
+  const url   = document.getElementById('wr-notice-url')?.value.trim();
+  const resEl = document.getElementById('wr-add-notice-result');
+  const btn = document.getElementById('wr-add-notice-btn');
+
+  if(!title) { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Notice title is required.</div>'; return; }
+  if(!body)  { if(resEl) resEl.innerHTML = '<div class="alert alert-danger">Notice body is required.</div>'; return; }
+
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Attaching…';
+  try {
+    const r = await callBackend('addNotice', {
+      title, body,
+      dateISO: dateISO || '',
+      driveUrl: url || '',
+      attachedBy: 'Warden'
+    });
+    btn.disabled = false; btn.innerHTML = '📌 Attach Notice';
+    if(r && r.success) {
+      toast('✅ Notice attached successfully.', 'success');
+      document.getElementById('wr-notice-title').value = '';
+      document.getElementById('wr-notice-body').value = '';
+      document.getElementById('wr-notice-url').value = '';
+      if(resEl) resEl.innerHTML = '';
+      loadWardenNotices();
+      loadHomeNotices();  // refresh home panel too
+    } else {
+      if(resEl) resEl.innerHTML = '<div class="alert alert-danger">⚠ ' + ((r && r.error) || 'Failed to attach notice.') + '</div>';
+    }
+  } catch(e) {
+    btn.disabled = false; btn.innerHTML = '📌 Attach Notice';
+    if(resEl) resEl.innerHTML = '<div class="alert alert-danger">⚠ Error: ' + (e.message || 'Unknown error') + '</div>';
+  }
+}
+
+async function wrDeleteNotice(id) {
+  if(!confirm('Remove this notice? It will no longer be shown on the home page.')) return;
+  try {
+    const r = await callBackend('deleteNotice', { id });
+    if(r && r.success) {
+      toast('Notice removed.', 'success');
+      loadWardenNotices();
+      loadHomeNotices();
+    } else {
+      toast('Failed: ' + ((r && r.error) || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    toast('Error: ' + (e.message || 'Unknown'), 'error');
+  }
+}
+
 
 // ── RE-GENERATE PROVISIONAL LETTER (warden) ─────────────────────────────────────
 // v25.1: The warden can change the payment deadline when re-generating the
@@ -11154,8 +11991,8 @@ function renderDebarReport() {
       : d.active && d.feeWaived === false
         ? `<span style="color:var(--danger);font-size:12px">Fee retained</span>`
         : `<span style="color:var(--gray-400);font-size:12px">—</span>`;
-    const debarDate  = d.debarredAt  ? new Date(d.debarredAt).toLocaleDateString('en-IN')  : '—';
-    const restoreDate= d.restoredAt  ? new Date(d.restoredAt).toLocaleDateString('en-IN')  : '—';
+    const debarDate  = d.debarredAt  ? _fmtDispDDMMYYYY(d.debarredAt)  : '—';
+    const restoreDate= d.restoredAt  ? _fmtDispDDMMYYYY(d.restoredAt)  : '—';
     const period     = d.active
       ? `${debarDate} → <span style="color:var(--danger);font-weight:600">Ongoing</span>`
       : `${debarDate} → ${restoreDate}`;
@@ -11218,8 +12055,8 @@ function generateDebarReport(format) {
       hi.hostel||'',
       hi.roomNo||'',
       (d.semesters||[]).map(_semLabelLocal).join(', '),
-      d.debarredAt  ? new Date(d.debarredAt).toLocaleDateString('en-IN')  : '',
-      d.restoredAt  ? new Date(d.restoredAt).toLocaleDateString('en-IN')  : '',
+      d.debarredAt  ? _fmtDispDDMMYYYY(d.debarredAt)  : '',
+      d.restoredAt  ? _fmtDispDDMMYYYY(d.restoredAt)  : '',
       d.reason||'',
       (d.semesters||[]).length * 4500,
       d.active ? 'ACTIVE' : 'LIFTED',
@@ -11580,14 +12417,14 @@ function renderDebarList() {
       const n = Number(v);
       return (!isNaN(n) && n >= 1 && n <= 8) ? 'Semester ' + n : v + ' Session';
     });
-    const debarDate   = d.debarredAt ? new Date(d.debarredAt).toLocaleDateString('en-IN') : '—';
-    const restoreDate = d.restoredAt ? new Date(d.restoredAt).toLocaleDateString('en-IN') : null;
+    const debarDate   = d.debarredAt ? _fmtDispDDMMYYYY(d.debarredAt) : '—';
+    const restoreDate = d.restoredAt ? _fmtDispDDMMYYYY(d.restoredAt) : null;
     const cardId      = uid + '_' + idx;
     const statusBadge = d.active
       ? `<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">ACTIVE</span>`
       : `<span style="background:var(--success-bg);color:var(--success);border:1px solid var(--success);padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">LIFTED</span>`;
     const letterInfo = d.letterNo
-      ? `<span style="font-size:11px;color:var(--gray-600);margin-left:6px">· Order: <strong>${d.letterNo}</strong>${d.letterDate ? ' dt. '+new Date(d.letterDate).toLocaleDateString('en-IN') : ''}</span>`
+      ? `<span style="font-size:11px;color:var(--gray-600);margin-left:6px">· Order: <strong>${d.letterNo}</strong>${d.letterDate ? ' dt. '+_fmtDispDDMMYYYY(d.letterDate) : ''}</span>`
       : '';
 
     return `
@@ -11617,7 +12454,7 @@ function renderDebarList() {
           <div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Debarred On</span><br/>${debarDate}</div>
           ${restoreDate ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Lifted On</span><br/>${restoreDate}</div>` : ''}
           ${d.letterNo ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Office Order No.</span><br/><strong>${d.letterNo}</strong></div>` : ''}
-          ${d.letterDate ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Order Date</span><br/>${new Date(d.letterDate).toLocaleDateString('en-IN')}</div>` : ''}
+          ${d.letterDate ? `<div><span style="color:var(--gray-600);font-size:10px;font-weight:600;text-transform:uppercase">Order Date</span><br/>${_fmtDispDDMMYYYY(d.letterDate)}</div>` : ''}
         </div>
         <div style="font-size:12px;color:var(--gray-800);background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:7px 10px;margin-bottom:8px"><strong>Reason:</strong> ${d.reason || '—'}</div>
         ${d.restoreReason ? `<div style="font-size:11px;color:var(--success);margin-bottom:8px"><strong>Restore note:</strong> ${d.restoreReason}</div>` : ''}
@@ -11730,7 +12567,7 @@ function _rptDate(s) {
     const dateOnly = String(s).split('T')[0];
     if(!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return s;
     const [y,m,d] = dateOnly.split('-').map(Number);
-    return new Date(y, m-1, d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    return _fmtDispDDMMYYYY(y, m-1, d);
   } catch { return s; }
 }
 function _rptInstituteName() {
@@ -12296,10 +13133,10 @@ function renderFinesReport() {
 
   rows.forEach(({student: s, fine: f}, idx) => {
     const hi = s.hostelInfo||{};
-    const imposedDate = f.imposedAt ? new Date(f.imposedAt).toLocaleDateString('en-IN') : (f.date||'—');
-    const orderDate   = f.letterDate ? new Date(f.letterDate).toLocaleDateString('en-IN') : '—';
-    const paidDate    = f.paidAt     ? new Date(f.paidAt).toLocaleDateString('en-IN')     : '—';
-    const revokeDate  = f.revokeLetterDate ? new Date(f.revokeLetterDate).toLocaleDateString('en-IN') : '—';
+    const imposedDate = f.imposedAt ? _fmtDispDDMMYYYY(f.imposedAt) : (f.date||'—');
+    const orderDate   = f.letterDate ? _fmtDispDDMMYYYY(f.letterDate) : '—';
+    const paidDate    = f.paidAt     ? _fmtDispDDMMYYYY(f.paidAt)     : '—';
+    const revokeDate  = f.revokeLetterDate ? _fmtDispDDMMYYYY(f.revokeLetterDate) : '—';
 
     let statusBadge;
     if(f.revoked) {
@@ -12366,14 +13203,14 @@ function generateFinesReport(format) {
     return [
       i+1, s.rollFull, s.name, hi.hostel||'', hi.roomNo||'',
       f.form||'', f.reason||'', Number(f.amount||0),
-      f.imposedAt ? new Date(f.imposedAt).toLocaleDateString('en-IN') : (f.date||''),
+      f.imposedAt ? _fmtDispDDMMYYYY(f.imposedAt) : (f.date||''),
       f.letterNo||'',
-      f.letterDate ? new Date(f.letterDate).toLocaleDateString('en-IN') : '',
+      f.letterDate ? _fmtDispDDMMYYYY(f.letterDate) : '',
       payStatus,
-      f.paidAt ? new Date(f.paidAt).toLocaleDateString('en-IN') : '',
+      f.paidAt ? _fmtDispDDMMYYYY(f.paidAt) : '',
       f.revoked ? 'Yes' : 'No',
       f.revokeLetterNo||'',
-      f.revokeLetterDate ? new Date(f.revokeLetterDate).toLocaleDateString('en-IN') : ''
+      f.revokeLetterDate ? _fmtDispDDMMYYYY(f.revokeLetterDate) : ''
     ];
   });
 
@@ -12495,8 +13332,8 @@ function renderAlumniReport() {
               .map(p => String(p.sessionId||p.semester||'').trim()).filter(Boolean)
     )];
 
-    const admDate   = s.admissionDate || (payments[0]?.paidAt ? new Date(payments[0].paidAt).toLocaleDateString('en-IN') : '—');
-    const vacatedOn = dl.alumniDate ? new Date(dl.alumniDate).toLocaleDateString('en-IN') : '—';
+    const admDate   = s.admissionDate || (payments[0]?.paidAt ? _fmtDispDDMMYYYY(payments[0].paidAt) : '—');
+    const vacatedOn = dl.alumniDate ? _fmtDispDDMMYYYY(dl.alumniDate) : '—';
     const hasNoDues = !!(dl.noDuesRef || dl.noDuesLetter || s.noDuesRef);
     const noDuesBadge = hasNoDues
       ? `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:var(--success-bg);color:var(--success)">✓ Issued</span>`
@@ -12568,7 +13405,7 @@ function generateAlumniReport(format) {
       (dl.noDuesRef||dl.noDuesLetter||s.noDuesRef) ? 'Issued' : 'Pending',
       dl.noDuesRef||s.noDuesRef||'',
       dl.cautionRefunded ? 'Yes' : 'No',
-      dl.alumniDate ? new Date(dl.alumniDate).toLocaleDateString('en-IN') : ''
+      dl.alumniDate ? _fmtDispDDMMYYYY(dl.alumniDate) : ''
     ];
   });
 
@@ -12612,6 +13449,9 @@ function _printReport(tableWrapperId, title, session, hostel, genDate) {
   win.focus();
   setTimeout(()=>win.print(), 600);
 }
+
+// v25.5: Load notices on page load
+loadHomeNotices();
 </script>
 </body>
 </html>
