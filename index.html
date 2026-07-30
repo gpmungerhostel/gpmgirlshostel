@@ -1073,6 +1073,11 @@
         <button class="btn btn-danger" onclick="imposeFine()" id="wr-impose-btn">Impose Fine</button>
         <hr class="divider"/>
         <div class="section-heading">Revoke Fine</div>
+        <div class="alert alert-info" style="font-size:12px;margin-bottom:12px">
+          💡 You can revoke <strong>any</strong> fine here — including system-generated late fines (Late Provisional Fine / Late Session Fee).
+          A revoked late fine is <strong>permanently waived</strong> and will NOT be re-imposed by the system.
+          A revocation reason is required for the audit trail.
+        </div>
         <div class="field" style="position:relative">
           <label>Search Student (Roll No. / Name)</label>
           <input type="text" id="wr-revoke-student-search" placeholder="Type roll number or name…"
@@ -1086,10 +1091,19 @@
           <div id="wr-revoke-student-pill" style="margin-top:6px;display:none"></div>
         </div>
         <div class="field" style="margin-top:10px">
-          <label>Select Fine</label>
+          <label>Select Fine <span class="req">*</span></label>
           <select id="wr-revoke-fine">
             <option value="">— Select fine —</option>
           </select>
+          <div class="hint" style="margin-top:5px;font-size:11px">
+            System-generated late fines are tagged <strong>[Late Prov Fine]</strong> or <strong>[Late Sess Fine]</strong>.
+            Manual fines are shown without a tag.
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label>Reason for Revocation <span class="req">*</span></label>
+          <textarea id="wr-revoke-reason" rows="2" placeholder="e.g. Fine waived on compassionate grounds / Student already paid in cash / etc." style="width:100%"></textarea>
+          <div class="hint">This reason is stored in the audit trail and shown to the student.</div>
         </div>
         <div class="form-row" style="margin-top:12px;margin-bottom:12px">
           <div class="field" style="margin-bottom:0">
@@ -1205,11 +1219,23 @@
         <div class="section-heading">Unlock Student Account</div>
         <div class="alert alert-warning" style="margin-bottom:16px;font-size:13px">
           A student account is locked after <strong>5 wrong passwords</strong> and <strong>2 failed password resets</strong>.
-          Use the master key to unlock their account.
+          Enter the student's roll number and the master key to unlock their account.
         </div>
         <div class="field">
-          <label>Student Email <span class="req">*</span></label>
-          <input type="email" id="wr-unlock-email" placeholder="student@email.com"/>
+          <label>Student Roll Number <span class="req">*</span></label>
+          <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+            <input type="text" id="wr-unlock-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                   oninput="_sanitizeEnglishInput(this)"
+                   style="text-align:center;font-weight:600"/>
+            <select id="wr-unlock-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+              <option>CE</option><option selected>CSE</option><option>EE</option>
+              <option>EC</option><option>FTS</option><option>ME</option>
+            </select>
+            <input type="text" id="wr-unlock-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                   oninput="_sanitizeEnglishInput(this)"
+                   style="text-align:center;font-weight:600"/>
+          </div>
+          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026)</div>
           <div class="err-msg hidden" id="err-wr-unlock-email"></div>
         </div>
         <div class="field">
@@ -2009,11 +2035,17 @@
           <div class="card-title" style="font-size:17px">🚫 Debar a Student</div>
           <div class="card-subtitle">Select a student and the session(s) they are debarred from.</div>
 
-          <div class="field">
-            <label>Student <span class="req">*</span></label>
-            <select id="wr-debar-roll" onchange="onDebarStudentChange()">
-              <option value="">— Select Student —</option>
-            </select>
+          <div class="field" style="position:relative">
+            <label>Search Student (Roll No. / Name) <span class="req">*</span></label>
+            <input type="text" id="wr-debar-student-search" placeholder="Type roll number or name…"
+                   autocomplete="off"
+                   oninput="_wrDebarStudentSearch(this.value)"
+                   onfocus="_wrDebarStudentShow(true)"
+                   onblur="_wrDebarStudentShow(false)"/>
+            <input type="hidden" id="wr-debar-roll"/>
+            <div id="wr-debar-student-dropdown"
+                 style="position:absolute;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--gray-200);border-radius:0 0 var(--radius-md) var(--radius-md);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;display:none"></div>
+            <div id="wr-debar-student-pill" style="margin-top:6px;display:none"></div>
             <div class="err-msg hidden" id="err-wr-debar-roll"></div>
           </div>
 
@@ -2307,11 +2339,23 @@
         </div>
         <div class="alert alert-warning" style="margin-bottom:16px;font-size:13px">
           A student account is locked after <strong>5 wrong passwords</strong> and <strong>2 failed password resets</strong>.
-          Verify student identity in person, then use the master key to unlock.
+          Verify student identity in person, then enter their roll number and the master key to unlock.
         </div>
         <div class="field">
-          <label>Student Email <span class="req">*</span></label>
-          <input type="email" id="adm-unlock-email" placeholder="student@email.com"/>
+          <label>Student Roll Number <span class="req">*</span></label>
+          <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+            <input type="text" id="adm-unlock-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                   oninput="_sanitizeEnglishInput(this)"
+                   style="text-align:center;font-weight:600"/>
+            <select id="adm-unlock-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+              <option>CE</option><option selected>CSE</option><option>EE</option>
+              <option>EC</option><option>FTS</option><option>ME</option>
+            </select>
+            <input type="text" id="adm-unlock-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                   oninput="_sanitizeEnglishInput(this)"
+                   style="text-align:center;font-weight:600"/>
+          </div>
+          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026)</div>
           <div class="err-msg hidden" id="err-adm-unlock-email"></div>
         </div>
         <div class="field">
@@ -2651,7 +2695,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v25.6';
+const EXPECTED_BACKEND_VERSION = 'v25.8';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -5652,22 +5696,27 @@ async function reissueAllotmentLetterForStudent(rollFull) {
 }
 
 async function wardenUnlockStudentAccount() {
-  const email = getVal('wr-unlock-email');
+  // v25.8: Use roll number (3-part input) instead of email.
+  const no  = (document.getElementById('wr-unlock-roll-no')?.value||'').trim();
+  const br  = document.getElementById('wr-unlock-roll-branch')?.value||'';
+  const yr  = (document.getElementById('wr-unlock-roll-year')?.value||'').trim();
+  const rollFull = no && br && yr ? `${no}/${br}/${yr}` : '';
   const masterKey = document.getElementById('wr-unlock-masterkey')?.value||'';
   const resultDiv = document.getElementById('wr-unlock-result');
   let ok = true;
-  if(!email) { showErr('wr-unlock-email','Student email required'); document.getElementById('err-wr-unlock-email').classList.remove('hidden'); ok=false; } else clearErr('wr-unlock-email');
+  if(!rollFull) { showErr('wr-unlock-email','Student roll number required (all 3 fields)'); document.getElementById('err-wr-unlock-email').classList.remove('hidden'); ok=false; } else clearErr('wr-unlock-email');
   if(!masterKey) { showErr('wr-unlock-key','Master key required'); document.getElementById('err-wr-unlock-key').classList.remove('hidden'); ok=false; } else clearErr('wr-unlock-key');
   if(!ok) return;
 
   const btn = document.getElementById('btn-wr-unlock');
   btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Unlocking…';
-  const r = await callBackend('unlockAccount', {email, masterKey});
+  const r = await callBackend('unlockAccount', {rollFull, masterKey});
   btn.disabled=false; btn.innerHTML='🔓 Unlock Account';
 
   if(r.success) {
-    resultDiv.innerHTML=`<div class="alert alert-success">✅ Account for <strong>${email}</strong> has been successfully unlocked. The student can now login normally.</div>`;
-    document.getElementById('wr-unlock-email').value='';
+    resultDiv.innerHTML=`<div class="alert alert-success">✅ Account for <strong>${rollFull}</strong> (${r.email||'student'}) has been successfully unlocked. The student can now login normally.</div>`;
+    document.getElementById('wr-unlock-roll-no').value='';
+    document.getElementById('wr-unlock-roll-year').value='';
     document.getElementById('wr-unlock-masterkey').value='';
   } else {
     resultDiv.innerHTML=`<div class="alert alert-danger">⚠ ${r.error||'Failed to unlock account.'}</div>`;
@@ -6240,13 +6289,25 @@ function wrFilterStudents() {
 }
 
 function wrTab(name) {
-  ['applications','students','fines','leaves','grievances','nodues','letters','notices','messages','unlock','datesettings','reports','debar'].forEach(t=>{
+  // v25.7 BUG FIX: The tab-content array AND the active-button array must
+  // EXACTLY match the order of <button class="tab-btn"> elements inside
+  // #wr-dashboard .tabs in the HTML. The previous arrays were out of sync
+  // (notices/messages/grievances/unlock/datesettings/reports were shuffled),
+  // which caused the wrong tab button to be highlighted when one was clicked.
+  // Actual HTML button order (verified):
+  //   applications, students, fines, leaves, nodues, letters, grievances,
+  //   unlock, datesettings, reports, messages, notices, debar
+  const TAB_ORDER = ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','messages','notices','debar'];
+  TAB_ORDER.forEach(t=>{
     const el = document.getElementById('wr-tab-'+t);
     if(el) el.classList.toggle('hidden', t!==name);
     if(el) el.style.display = (t!==name) ? 'none' : '';
   });
-  document.querySelectorAll('#wr-dashboard .tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active', ['applications','students','fines','leaves','nodues','letters','notices','messages','grievances','unlock','datesettings','reports','debar'][i]===name);
+  // v25.7: Use a more specific selector to target only the warden's main tab
+  // buttons (the ones inside #wr-dashboard > .card > .tabs), so dynamic
+  // buttons added later in other panels can't accidentally be matched.
+  document.querySelectorAll('#wr-dashboard > .card > .tabs > .tab-btn').forEach((b,i)=>{
+    b.classList.toggle('active', TAB_ORDER[i]===name);
   });
   // Reload data for each tab switch
   if(name==='applications') {
@@ -6267,7 +6328,11 @@ function wrTab(name) {
   else if(name==='messages') { loadWardenSentMessages(); }
   else if(name==='debar') { loadDebarTab(); }
   else if(name==='unlock') {
-    document.getElementById('wr-unlock-email').value='';
+    // v25.8: Reset roll-number fields instead of email
+    const rollNoEl = document.getElementById('wr-unlock-roll-no');
+    const rollYrEl = document.getElementById('wr-unlock-roll-year');
+    if(rollNoEl) rollNoEl.value='';
+    if(rollYrEl) rollYrEl.value='';
     document.getElementById('wr-unlock-masterkey').value='';
     document.getElementById('wr-unlock-result').innerHTML='';
     clearErr('wr-unlock-email'); clearErr('wr-unlock-key');
@@ -7759,7 +7824,18 @@ function populateFinesList() {
   s.fines.forEach((f,i)=>{
     if(f.revoked) return;
     if(f.paid && f.paymentVerified) return; // already paid & verified — cannot be revoked
-    const o = document.createElement('option'); o.value=i; o.text=`₹${f.amount} — ${f.reason} (${_fmtDispDDMMYYYY(f.date)})`; sel.add(o);
+    // v25.8 Bug 3: Show fine category badge so the warden can distinguish
+    // system-generated late fines (provisional/semester) from manual fines.
+    const isSystem = f.isSystemGenerated;
+    const cat = f.fineCategory === 'provisional' ? 'Late Prov Fine'
+              : f.fineCategory === 'semester'    ? 'Late Sess Fine'
+              : isSystem                          ? 'System Fine'
+              : 'Manual Fine';
+    const catTag = isSystem ? ` [${cat}]` : '';
+    const o = document.createElement('option');
+    o.value = i;
+    o.text = `₹${f.amount} — ${f.reason}${catTag} (${_fmtDispDDMMYYYY(f.date)})`;
+    sel.add(o);
   });
 }
 
@@ -7819,9 +7895,16 @@ function _wrFineStudentClear() {
   document.getElementById('wr-fine-student-dropdown').style.display = 'none';
 }
 
-// v25.5 Bug 2: searchable student picker for the REVOKE FINE form
+// v25.8 Bug 3: searchable student picker for the REVOKE FINE form
+// Include ALL students with active (non-revoked, non-paid-verified) fines —
+// not just 'approved' students. Late fines apply to 'provisional' and 'pending'
+// students too, and the warden must be able to revoke them.
 function _wrRevokeStudentAll() {
-  return wrStudents.filter(s => s.status === 'approved' && Array.isArray(s.fines) && s.fines.some(f => !f.revoked && !(f.paid && f.paymentVerified)));
+  return wrStudents.filter(s =>
+    ['approved','pending','provisional','new_pending','debarred','alumni'].includes(s.status) &&
+    Array.isArray(s.fines) &&
+    s.fines.some(f => !f.revoked && !(f.paid && f.paymentVerified))
+  );
 }
 function _wrRevokeStudentSearch(q) {
   const dd = document.getElementById('wr-revoke-student-dropdown');
@@ -7977,17 +8060,31 @@ async function imposeFine() {
 async function revokeFine() {
   const roll = document.getElementById('wr-revoke-student')?.value;
   const idx  = document.getElementById('wr-revoke-fine')?.value;
+  const reason = (document.getElementById('wr-revoke-reason')?.value||'').trim();
   if(!roll || idx==='') { toast('Please select a student and fine','error'); return; }
+  // v25.8 Bug 3: Require a revocation reason for the audit trail.
+  if(!reason) { toast('Please provide a reason for revocation.','error'); return; }
+
+  // Confirm specifically if revoking a system-generated late fine
+  const s = wrStudents.find(x=>x.rollFull===roll);
+  const fineObj = s && Array.isArray(s.fines) ? s.fines[Number(idx)] : null;
+  if(fineObj && fineObj.isSystemGenerated) {
+    const catLabel = fineObj.fineCategory === 'provisional' ? 'Late Provisional Fee Fine'
+                   : fineObj.fineCategory === 'semester'    ? 'Late Session Fee Fine'
+                   : 'system-generated fine';
+    if(!confirm(`You are about to revoke a ${catLabel} of ₹${fineObj.amount}.\n\nThis will permanently remove the fine from the student's record. The student will no longer be required to pay this amount.\n\nProceed with revocation?`)) return;
+  }
 
   const btn = document.getElementById('wr-revoke-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Revoking…';
 
-  const s = wrStudents.find(x=>x.rollFull===roll);
   const revokeLetterNo   = (document.getElementById('wr-revoke-letter-no')?.value||'').trim();
   const revokeLetterDate = (document.getElementById('wr-revoke-letter-date')?.value||'').trim();
   const r = await callBackend('revokeFine', {
     rollFull:roll, fineIndex:Number(idx),
     letterNo: revokeLetterNo, letterDate: revokeLetterDate,
+    revokedBy: 'Warden',
+    revokedReason: reason,
     studentEmail: s?.email||'', wardenEmail:'gpmungerhostel@gmail.com'
   });
   btn.disabled=false; btn.textContent='Revoke Selected Fine';
@@ -7999,6 +8096,7 @@ async function revokeFine() {
     _wrRevokeStudentClear();
     const rlnEl=document.getElementById('wr-revoke-letter-no'); if(rlnEl) rlnEl.value='';
     const rldEl=document.getElementById('wr-revoke-letter-date'); if(rldEl) rldEl.value='';
+    const rrsEl=document.getElementById('wr-revoke-reason'); if(rrsEl) rrsEl.value='';
     // FIX: refresh only this student
     const rvr = await callBackend('getStudent',{rollFull:roll});
     if(rvr.success&&rvr.student){const ri=wrStudents.findIndex(x=>x.rollFull===roll);if(ri>=0)wrStudents[ri]=rvr.student;}
@@ -9654,7 +9752,11 @@ function admTab(name) {
   else if(name==='grievances') { admFilterGrievances('all'); }
   else if(name==='messages') { loadAdmSentMessages(); }
   else if(name==='unlock') {
-    document.getElementById('adm-unlock-email').value='';
+    // v25.8: Reset roll-number fields instead of email
+    const rollNoEl = document.getElementById('adm-unlock-roll-no');
+    const rollYrEl = document.getElementById('adm-unlock-roll-year');
+    if(rollNoEl) rollNoEl.value='';
+    if(rollYrEl) rollYrEl.value='';
     document.getElementById('adm-unlock-masterkey').value='';
     document.getElementById('adm-unlock-result').innerHTML='';
   }
@@ -10284,20 +10386,25 @@ async function admRejectPaymentConfirm(rollFull, paymentIndex, inlineId) {
 
 // ── ACCOUNT UNLOCK (Admin) ──
 async function adminUnlockAccount() {
-  const email     = document.getElementById('adm-unlock-email')?.value.trim();
+  // v25.8: Use roll number (3-part input) instead of email.
+  const no  = (document.getElementById('adm-unlock-roll-no')?.value||'').trim();
+  const br  = document.getElementById('adm-unlock-roll-branch')?.value||'';
+  const yr  = (document.getElementById('adm-unlock-roll-year')?.value||'').trim();
+  const rollFull = no && br && yr ? `${no}/${br}/${yr}` : '';
   const masterKey = document.getElementById('adm-unlock-masterkey')?.value||'';
   const resultDiv = document.getElementById('adm-unlock-result');
   let ok=true;
-  if(!email) { showErr('adm-unlock-email','Student email required'); document.getElementById('err-adm-unlock-email').classList.remove('hidden'); ok=false; } else clearErr('adm-unlock-email');
+  if(!rollFull) { showErr('adm-unlock-email','Student roll number required (all 3 fields)'); document.getElementById('err-adm-unlock-email').classList.remove('hidden'); ok=false; } else clearErr('adm-unlock-email');
   if(!masterKey) { showErr('adm-unlock-key','Master key required'); document.getElementById('err-adm-unlock-key').classList.remove('hidden'); ok=false; } else clearErr('adm-unlock-key');
   if(!ok) return;
   const btn = document.getElementById('btn-adm-unlock');
   btn.disabled=true; btn.innerHTML='<span class="spinner spinner-dark"></span> Unlocking…';
-  const r = await callBackend('adminUnlockAccount', {email, masterKey});
+  const r = await callBackend('adminUnlockAccount', {rollFull, masterKey});
   btn.disabled=false; btn.innerHTML='🔓 Unlock Account';
   if(r.success) {
-    resultDiv.innerHTML=`<div class="alert alert-success">✅ Account for <strong>${email}</strong> has been successfully unlocked. The student can now login normally.<br/><small style="opacity:.7">Action logged by Admin Office.</small></div>`;
-    document.getElementById('adm-unlock-email').value='';
+    resultDiv.innerHTML=`<div class="alert alert-success">✅ Account for <strong>${rollFull}</strong> (${r.email||'student'}) has been successfully unlocked. The student can now login normally.<br/><small style="opacity:.7">Action logged by Admin Office.</small></div>`;
+    document.getElementById('adm-unlock-roll-no').value='';
+    document.getElementById('adm-unlock-roll-year').value='';
     document.getElementById('adm-unlock-masterkey').value='';
   } else {
     resultDiv.innerHTML=`<div class="alert alert-danger">⚠ ${r.error||'Failed to unlock account.'}</div>`;
@@ -12195,20 +12302,80 @@ function removeDebarTag(btn) {
 function getDebarSemesterOptions() { return []; }
 
 function loadDebarTab() {
-  populateDebarStudentDropdown();
+  // v25.8: No longer pre-populates a dropdown — the searchable input loads
+  // results on demand via _wrDebarStudentSearch().
   renderDebarSemCheckboxes();
   loadDebarRecords();
+  // Clear any previous search state
+  _wrDebarStudentClear();
 }
 
-function populateDebarStudentDropdown() {
-  const sel = document.getElementById('wr-debar-roll');
-  if(!sel) return;
-  // Only show approved / pending / debarred students
-  const eligible = wrStudents.filter(s => ['approved','pending','debarred'].includes(s.status));
-  sel.innerHTML = '<option value="">— Select Student —</option>' +
-    eligible.map(s => `<option value="${s.rollFull}">${s.name} (${s.rollFull}) — ${s.status}</option>`).join('');
-  document.getElementById('wr-debar-student-info').classList.add('hidden');
+// v25.8 Bug 1: searchable student picker for the Debar tab (replaces dropdown).
+// Includes approved / pending / debarred students.
+function _wrDebarStudentAll() {
+  return wrStudents.filter(s => ['approved','pending','debarred'].includes(s.status));
 }
+function _wrDebarStudentSearch(q) {
+  const dd = document.getElementById('wr-debar-student-dropdown');
+  if(!dd) return;
+  // Clear previous selection when user types
+  document.getElementById('wr-debar-roll').value = '';
+  document.getElementById('wr-debar-student-pill').style.display = 'none';
+  document.getElementById('wr-debar-student-info').classList.add('hidden');
+  const query = (q||'').toLowerCase().trim();
+  if(!query) { dd.style.display='none'; dd.innerHTML=''; return; }
+  const matches = _wrDebarStudentAll()
+    .filter(s => (s.name||'').toLowerCase().includes(query) || (s.rollFull||'').toLowerCase().includes(query))
+    .slice(0, 30);
+  if(!matches.length) {
+    dd.innerHTML = '<div style="padding:10px 12px;color:var(--gray-500);font-size:13px">No matching students</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(s =>
+    `<div onmousedown="_wrDebarStudentPick('${s.rollFull.replace(/'/g,"\\'")}')"
+         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gray-100);font-size:13px"
+         onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='#fff'">
+       <strong>${s.name}</strong> <span style="color:var(--gray-600)">(${s.rollFull})</span>
+       <span style="font-size:10px;color:var(--gray-500);margin-left:6px">${s.status}</span>
+     </div>`).join('');
+  dd.style.display = 'block';
+}
+function _wrDebarStudentShow(show) {
+  setTimeout(() => {
+    const dd = document.getElementById('wr-debar-student-dropdown');
+    if(dd) dd.style.display = show ? 'block' : 'none';
+  }, 150);
+}
+function _wrDebarStudentPick(rollFull) {
+  document.getElementById('wr-debar-roll').value = rollFull;
+  const s = wrStudents.find(x => x.rollFull === rollFull);
+  const pill = document.getElementById('wr-debar-student-pill');
+  const search = document.getElementById('wr-debar-student-search');
+  if(s) {
+    search.value = s.name + ' (' + s.rollFull + ')';
+    pill.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#fdf0f0;color:var(--danger);border-radius:14px;font-size:12px;font-weight:600">✓ ${s.name} · ${s.rollFull}<span style="cursor:pointer;color:var(--gray-500)" onclick="_wrDebarStudentClear()">✕</span></span>`;
+    pill.style.display = 'block';
+  }
+  document.getElementById('wr-debar-student-dropdown').style.display = 'none';
+  onDebarStudentChange();
+  clearErr('wr-debar-roll');
+}
+function _wrDebarStudentClear() {
+  const rollEl = document.getElementById('wr-debar-roll');
+  const searchEl = document.getElementById('wr-debar-student-search');
+  const pillEl = document.getElementById('wr-debar-student-pill');
+  const ddEl = document.getElementById('wr-debar-student-dropdown');
+  const infoEl = document.getElementById('wr-debar-student-info');
+  if(rollEl) rollEl.value = '';
+  if(searchEl) searchEl.value = '';
+  if(pillEl) pillEl.style.display = 'none';
+  if(ddEl) ddEl.style.display = 'none';
+  if(infoEl) infoEl.classList.add('hidden');
+}
+
+// Kept for backward compatibility — no-op now (searchable input replaces dropdown)
+function populateDebarStudentDropdown() { /* no-op in v25.8 */ }
 
 function renderDebarSemCheckboxes() {
   const container = document.getElementById('wr-debar-sem-checkboxes');
@@ -12349,9 +12516,8 @@ async function doDebarStudent() {
       <small style="color:var(--gray-600)">Debar ID: ${r.debarId}</small>
     </div>`;
     // Reset form
-    document.getElementById('wr-debar-roll').value = '';
     document.getElementById('wr-debar-reason').value = '';
-    document.getElementById('wr-debar-student-info').classList.add('hidden');
+    _wrDebarStudentClear();  // v25.8: clear searchable input + pill + info box
     if(feeWaiveEl)  { feeWaiveEl.checked  = false; }
     if(feeRetainEl) { feeRetainEl.checked = false; }
     onDebarFeeChange();
