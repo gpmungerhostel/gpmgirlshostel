@@ -632,6 +632,7 @@
         <button class="tab-btn active" onclick="authTab('login')">Login</button>
         <button class="tab-btn" onclick="authTab('register')">Register</button>
         <button class="tab-btn" onclick="authTab('forgot')">Forgot Password</button>
+        <button class="tab-btn" onclick="authTab('resetold')">Reset Password</button>
       </div>
 
       <!-- Login Form -->
@@ -717,6 +718,41 @@
           <div class="err-msg hidden" id="err-reset" style="margin-bottom:10px"></div>
           <button class="btn btn-primary btn-full" onclick="doReset()">Reset Password</button>
         </div>
+      </div>
+
+      <!-- v26.3: Reset Password using Old Password (no email reset code needed) -->
+      <div id="auth-resetold" class="hidden">
+        <div class="card-title" style="font-size:16px;margin-bottom:4px">Reset Password</div>
+        <div class="card-subtitle">Know your current password? Set a new one directly — no email reset code needed.</div>
+        <div class="alert alert-info" style="font-size:12px;margin:10px 0">
+          💡 Enter your <strong>current password</strong> (the one you use to log in) and your <strong>new password</strong>.
+          Your new password will be stored securely and you can use it to log in immediately.
+        </div>
+        <div class="field">
+          <label>Email ID <span class="req">*</span></label>
+          <input type="email" id="resetold-email" placeholder="your@email.com"/>
+        </div>
+        <div class="field">
+          <label>Current Password <span class="req">*</span></label>
+          <div style="position:relative">
+            <input type="password" id="resetold-old-pwd" placeholder="Your current password"/>
+            <button type="button" onclick="togglePwd('resetold-old-pwd','eye-resetold-old')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;z-index:2;font-size:18px" id="eye-resetold-old">👁</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>New Password <span class="req">*</span></label>
+          <div style="position:relative">
+            <input type="password" id="resetold-new-pwd" placeholder="At least 4 characters"/>
+            <button type="button" onclick="togglePwd('resetold-new-pwd','eye-resetold-new')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;z-index:2;font-size:18px" id="eye-resetold-new">👁</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Confirm New Password <span class="req">*</span></label>
+          <input type="password" id="resetold-cpwd" placeholder="Re-enter new password"/>
+        </div>
+        <div class="err-msg hidden" id="err-resetold" style="margin-bottom:10px"></div>
+        <button class="btn btn-primary btn-full" onclick="doResetOld()" id="btn-resetold">Reset Password</button>
+        <div id="resetold-result" style="margin-top:10px"></div>
       </div>
     </div>
   </div>
@@ -986,6 +1022,7 @@
         <button class="tab-btn" onclick="wrTab('reports')">📊 Reports</button>        <button class="tab-btn" onclick="wrTab('messages')" id="wr-tab-btn-messages">✉️ Messages</button>
         <button class="tab-btn" onclick="wrTab('notices')" id="wr-tab-btn-notices">📢 Notices</button>
 
+        <button class="tab-btn" onclick="wrTab('editstudent')" id="wr-tab-btn-editstudent">✏️ Edit Student</button>
         <button class="tab-btn" onclick="wrTab('debar')" id="wr-tab-btn-debar">🚫 Debar Students</button>
       </div>
 
@@ -2027,6 +2064,44 @@
       </div>
 
 
+      <!-- v26.0 Edit Student Tab (master-key-secured) -->
+      <div id="wr-tab-editstudent" class="hidden">
+        <div class="section-heading">✏️ Edit Student Record (Master Key Required)</div>
+        <div class="alert alert-warning" style="margin-bottom:16px;font-size:13px">
+          ⚠ This feature allows you to edit <strong>every field</strong> of a student record — including the
+          <strong>roll number</strong> and <strong>email</strong> (primary keys). All changes are secured by the
+          <strong>master key</strong> and logged for audit. Use with care.
+        </div>
+
+        <!-- Step 1: Search Student -->
+        <div class="field">
+          <label>Student Roll Number <span class="req">*</span></label>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+            <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+              <input type="text" id="wr-edit-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrEditSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+              <select id="wr-edit-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+                <option>CE</option><option selected>CSE</option><option>EE</option>
+                <option>EC</option><option>FTS</option><option>ME</option>
+              </select>
+              <input type="text" id="wr-edit-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrEditSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="_wrEditSearchStudent()" id="wr-edit-search-btn" style="white-space:nowrap">🔍 Search Student</button>
+          </div>
+          <div class="hint">Format: Number / Branch / Year (e.g. 25/CSE/2026)</div>
+          <div class="err-msg hidden" id="err-wr-edit-roll"></div>
+        </div>
+
+        <!-- Student preview + edit form (populated after search) -->
+        <div id="wr-edit-form-container"></div>
+      </div>
+
+
       <div id="wr-tab-debar" class="hidden">
         <div class="card" style="border-left:4px solid var(--danger);background:var(--danger-bg);margin-bottom:16px">
           <div style="font-weight:700;color:var(--danger);font-size:14px;margin-bottom:4px">⚠ Debarment Notice</div>
@@ -2709,7 +2784,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v25.9';
+const EXPECTED_BACKEND_VERSION = 'v26.3';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -3971,11 +4046,12 @@ function nsResetForm() {
 // ══════════════════════════════════════════════════════════
 // ── AUTH FUNCTIONS ──
 function authTab(name) {
-  ['login','register','forgot'].forEach(t=>{
+  // v26.3: Added 'resetold' tab for password reset using old password.
+  ['login','register','forgot','resetold'].forEach(t=>{
     document.getElementById('auth-'+t).classList.toggle('hidden', t!==name);
   });
   document.querySelectorAll('#cs-auth-gate .tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['login','register','forgot'][i]===name);
+    b.classList.toggle('active',['login','register','forgot','resetold'][i]===name);
   });
 }
 
@@ -4018,7 +4094,12 @@ async function doLogin() {
     const hint = (attemptsLeft !== '' && attemptsLeft > 0)
       ? ` <span style="font-size:12px;color:var(--warning)">(${attemptsLeft} attempt${attemptsLeft===1?'':'s'} remaining)</span>`
       : '';
-    errEl.innerHTML=(r.error||'Login failed.')+hint;
+    // v26.3: Show a "Reset Password" hint link when login fails
+    const resetHint = `<div style="margin-top:8px;font-size:12px">
+      <span style="color:var(--gray-500)">Forgot your password or having trouble logging in?</span>
+      <button class="btn btn-secondary btn-sm" style="margin-left:6px;font-size:11px" onclick="authTab('resetold')">Reset Password</button>
+    </div>`;
+    errEl.innerHTML=(r.error||'Login failed.')+hint+resetHint;
     errEl.classList.remove('hidden');
   }
 }
@@ -4088,6 +4169,63 @@ async function doReset() {
     document.getElementById('forgot-step2').classList.add('hidden');
   } else {
     errEl.textContent=r.error||'Reset failed.';errEl.classList.remove('hidden');
+  }
+}
+
+// v26.3: Reset password using the OLD password (no email reset code needed).
+// Verifies the old password (handles BOTH plain-text and SHA-256 hashed stored
+// passwords) and stores the new password as plain text.
+async function doResetOld() {
+  const email = (document.getElementById('resetold-email')?.value||"").trim().toLowerCase();
+  const oldPwd = document.getElementById('resetold-old-pwd')?.value || "";
+  const newPwd = document.getElementById('resetold-new-pwd')?.value || "";
+  const cpwd   = document.getElementById('resetold-cpwd')?.value || "";
+  const errEl  = document.getElementById('err-resetold');
+  const resultEl = document.getElementById('resetold-result');
+  const btn    = document.getElementById('btn-resetold');
+  errEl.classList.add('hidden');
+  if(resultEl) resultEl.innerHTML = '';
+
+  if(!email || !oldPwd || !newPwd || !cpwd) {
+    if(errEl) { errEl.textContent = 'All fields are required.'; errEl.classList.remove('hidden'); }
+    return;
+  }
+  if(newPwd !== cpwd) {
+    if(errEl) { errEl.textContent = 'New passwords do not match.'; errEl.classList.remove('hidden'); }
+    return;
+  }
+  if(newPwd.length < 4) {
+    if(errEl) { errEl.textContent = 'New password must be at least 4 characters.'; errEl.classList.remove('hidden'); }
+    return;
+  }
+  if(oldPwd === newPwd) {
+    if(errEl) { errEl.textContent = 'New password must be different from the current password.'; errEl.classList.remove('hidden'); }
+    return;
+  }
+
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Resetting…'; }
+  try {
+    const r = await callBackend('resetPasswordWithOld', { email, oldPassword: oldPwd, newPassword: newPwd });
+    if(btn) { btn.disabled = false; btn.innerHTML = 'Reset Password'; }
+    if(r && r.success) {
+      toast('✅ Password reset successfully! Please log in with your new password.', 'success');
+      if(resultEl) resultEl.innerHTML = '<div class="alert alert-success" style="font-size:13px">✅ ' + _esc(r.message || 'Password reset successfully.') + '</div>';
+      // Clear the form
+      document.getElementById('resetold-email').value = '';
+      document.getElementById('resetold-old-pwd').value = '';
+      document.getElementById('resetold-new-pwd').value = '';
+      document.getElementById('resetold-cpwd').value = '';
+      // Switch to login tab after 2 seconds
+      setTimeout(() => { authTab('login'); }, 2000);
+    } else {
+      const errMsg = (r && r.error) || 'Failed to reset password.';
+      if(errEl) { errEl.textContent = errMsg; errEl.classList.remove('hidden'); }
+      toast('Failed: ' + errMsg, 'error');
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.innerHTML = 'Reset Password'; }
+    if(errEl) { errEl.textContent = 'Error: ' + (e.message || 'Unknown'); errEl.classList.remove('hidden'); }
+    toast('Error: ' + (e.message || 'Unknown'), 'error');
   }
 }
 
@@ -5709,7 +5847,593 @@ async function reissueAllotmentLetterForStudent(rollFull) {
   }
 }
 
-// v25.9: Search student by roll number for the Unlock Account tab.
+// ══════════════════════════════════════════════════════════
+// v26.0 EDIT STUDENT (master-key-secured, full edit incl. roll + email)
+// ══════════════════════════════════════════════════════════
+let _wrEditOriginalRoll = null;
+let _wrEditPhotoB64 = null;
+
+function _wrEditReset() {
+  // Clear all edit-student fields when the tab is opened
+  const rollNoEl = document.getElementById('wr-edit-roll-no');
+  const rollYrEl = document.getElementById('wr-edit-roll-year');
+  if(rollNoEl) rollNoEl.value = '';
+  if(rollYrEl) rollYrEl.value = '';
+  const container = document.getElementById('wr-edit-form-container');
+  if(container) container.innerHTML = '';
+  _wrEditOriginalRoll = null;
+  _wrEditPhotoB64 = null;
+  clearErr('wr-edit-roll');
+}
+
+async function _wrEditSearchStudent() {
+  const no  = (document.getElementById('wr-edit-roll-no')?.value||'').trim();
+  const br  = document.getElementById('wr-edit-roll-branch')?.value||'';
+  const yr  = (document.getElementById('wr-edit-roll-year')?.value||'').trim();
+  const container = document.getElementById('wr-edit-form-container');
+  const searchBtn = document.getElementById('wr-edit-search-btn');
+  if(!container) return;
+
+  if(!no || !br || !yr) {
+    container.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter all three roll number fields (Number / Branch / Year).</div>';
+    _wrEditOriginalRoll = null;
+    clearErr('wr-edit-roll');
+    return;
+  }
+  const rollFull = `${no}/${br}/${yr}`;
+
+  if(searchBtn) { searchBtn.disabled = true; searchBtn.innerHTML = '<span class="spinner spinner-dark"></span> Searching…'; }
+  container.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Fetching student details…</div>';
+  clearErr('wr-edit-roll');
+
+  try {
+    const r = await callBackend('getStudent', { rollFull });
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+
+    if(!r || !r.success || !r.student) {
+      _wrEditOriginalRoll = null;
+      container.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">❌ No student found with roll number <strong>${rollFull}</strong>. Please check and try again.</div>`;
+      return;
+    }
+    _wrEditOriginalRoll = r.student.rollFull;
+    _wrEditPhotoB64 = null;
+    _wrEditRenderForm(r.student);
+    // Fetch photo in background
+    callBackend('getProfileImages', { rollFull: r.student.rollFull }).then(pr => {
+      if(pr && pr.success && pr.photo) {
+        _wrEditPhotoB64 = pr.photo;
+        const photoImg = document.getElementById('wr-edit-preview-photo');
+        if(photoImg) photoImg.src = 'data:image/jpeg;base64,' + pr.photo;
+      }
+    }).catch(()=>{});
+  } catch(e) {
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+    _wrEditOriginalRoll = null;
+    container.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown error'}</div>`;
+  }
+}
+
+function _wrEditRenderForm(s) {
+  const container = document.getElementById('wr-edit-form-container');
+  if(!container || !s) return;
+  // v26.1: Cache the student JSON on the container so _wrEditSave can retrieve
+  // the original payment/fine objects (to preserve fields we don't edit).
+  try { container.dataset.lastStudent = JSON.stringify(s); } catch(_) {}
+  const hi = s.hostelInfo || {};
+  const roomStr = hi.hostel ? `${hi.hostel} · Room ${hi.roomNo||'—'} · Bed ${hi.bedNo||'—'}` : 'Not allotted';
+  // Split rollFull for the editable roll input
+  const rollParts = String(s.rollFull||'').split('/');
+  const rollNo = rollParts[0] || '';
+  const rollBr = rollParts[1] || 'CSE';
+  const rollYr = rollParts[2] || '';
+  // Status options
+  const statusOpts = ['new_pending','provisional','pending','approved','debarred','alumni','rejected']
+    .map(st => `<option value="${st}" ${s.status===st?'selected':''}>${st}</option>`).join('');
+
+  container.innerHTML = `
+    <div style="border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:16px;background:#fafbfc;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">✓ Student Found — Edit Details Below</div>
+      <!-- Preview card -->
+      <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:16px">
+        <div style="flex-shrink:0">
+          <img id="wr-edit-preview-photo" src="" style="width:72px;height:88px;object-fit:cover;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);display:none"/>
+          <div id="wr-edit-preview-photo-placeholder" style="width:72px;height:88px;border:1.5px dashed var(--gray-200);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:11px;text-align:center">No<br>Photo</div>
+        </div>
+        <div style="flex:1;font-size:13px">
+          <div style="font-weight:700;color:var(--navy);font-size:15px">${_esc(s.name)}</div>
+          <div style="color:var(--gray-600);margin-top:2px">${_esc(s.rollFull)} · <span class="badge badge-${s.status||'pending'}">${s.status||'—'}</span></div>
+          <div style="color:var(--gray-500);margin-top:4px;font-size:12px">Hostel: ${_esc(roomStr)}</div>
+        </div>
+      </div>
+
+      <!-- Edit form -->
+      <div class="form-row">
+        <div class="field">
+          <label>New Roll Number <span style="color:var(--danger);font-size:11px">(primary key — change with care)</span></label>
+          <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+            <input type="text" id="wr-edit-new-roll-no" maxlength="3" value="${_esc(rollNo)}" inputmode="text" autocomplete="off"
+                   oninput="_sanitizeEnglishInput(this)" style="text-align:center;font-weight:600"/>
+            <select id="wr-edit-new-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+              <option ${rollBr==='CE'?'selected':''}>CE</option>
+              <option ${rollBr==='CSE'?'selected':''}>CSE</option>
+              <option ${rollBr==='EE'?'selected':''}>EE</option>
+              <option ${rollBr==='EC'?'selected':''}>EC</option>
+              <option ${rollBr==='FTS'?'selected':''}>FTS</option>
+              <option ${rollBr==='ME'?'selected':''}>ME</option>
+            </select>
+            <input type="text" id="wr-edit-new-roll-year" maxlength="4" value="${_esc(rollYr)}" inputmode="text" autocomplete="off"
+                   oninput="_sanitizeEnglishInput(this)" style="text-align:center;font-weight:600"/>
+          </div>
+          <div class="hint">Original: ${_esc(s.rollFull)}. Leave unchanged if not editing.</div>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="wr-edit-status" style="width:100%;padding:10px 12px">${statusOpts}</select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Student Name</label>
+          <input type="text" id="wr-edit-name" value="${_esc(s.name||'')}" style="text-transform:capitalize"/>
+        </div>
+        <div class="field">
+          <label>Guardian's Name</label>
+          <input type="text" id="wr-edit-guardian" value="${_esc(s.guardianName||'')}" style="text-transform:capitalize"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Date of Birth</label>
+          <input type="date" id="wr-edit-dob" value="${_esc(s.dob||'')}"/>
+        </div>
+        <div class="field">
+          <label>Contact No.</label>
+          <input type="text" id="wr-edit-contact" value="${_esc(s.contactNo||'')}"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Guardian Contact</label>
+          <input type="text" id="wr-edit-gcontact" value="${_esc(s.guardianContact||'')}"/>
+        </div>
+        <div class="field">
+          <label>Email <span style="color:var(--danger);font-size:11px">(primary key — change with care)</span></label>
+          <input type="email" id="wr-edit-email" value="${_esc(s.email||'')}"/>
+          <div class="hint">Original: ${_esc(s.email)}</div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>District</label>
+          <input type="text" id="wr-edit-district" value="${_esc(s.district||'')}"/>
+        </div>
+        <div class="field">
+          <label>PIN</label>
+          <input type="text" id="wr-edit-pin" value="${_esc(s.pin||'')}" maxlength="6"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Permanent Address</label>
+        <textarea id="wr-edit-address" rows="2" style="width:100%">${_esc(s.address||'')}</textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Admission Session</label>
+          <input type="text" id="wr-edit-admission-session" value="${_esc(s.admissionSession||'')}" placeholder="e.g. Odd 2025"/>
+        </div>
+        <div class="field">
+          <label>Current Semester No.</label>
+          <input type="text" id="wr-edit-semester-no" value="${_esc(s.semesterNo||'')}"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Access Key</label>
+          <input type="text" id="wr-edit-access-key" value="${_esc(s.accessKey||'')}"/>
+          <div class="hint">Used by student to download provisional letter</div>
+        </div>
+        <div class="field">
+          <label>Renewal Semester (if any)</label>
+          <input type="text" id="wr-edit-renewal-sem" value="${_esc(s.renewalSemester||'')}"/>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
+      <div class="section-heading" style="font-size:14px">Hostel Accommodation</div>
+      <div class="form-row" style="margin-top:10px">
+        <div class="field">
+          <label>Hostel Block</label>
+          <select id="wr-edit-hostel" style="width:100%;padding:10px 8px">
+            <option value="" ${!hi.hostel?'selected':''}>— Not Allotted —</option>
+            <option ${hi.hostel==='BH-01'?'selected':''}>BH-01</option>
+            <option ${hi.hostel==='BH-02'?'selected':''}>BH-02</option>
+            <option ${hi.hostel==='GH-01'?'selected':''}>GH-01</option>
+            <option ${hi.hostel==='GH-02'?'selected':''}>GH-02</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Room Number</label>
+          <input type="text" id="wr-edit-room" value="${_esc(hi.roomNo||'')}"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Bed Number</label>
+          <input type="text" id="wr-edit-bed" value="${_esc(hi.bedNo||'')}"/>
+        </div>
+        <div class="field">
+          <label>Chair Number</label>
+          <input type="text" id="wr-edit-chair" value="${_esc(hi.chairNo||'')}"/>
+        </div>
+        <div class="field">
+          <label>Table Number</label>
+          <input type="text" id="wr-edit-table" value="${_esc(hi.tableNo||'')}"/>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
+      <div class="section-heading" style="font-size:14px">💳 Payment Records <span style="font-size:11px;color:var(--gray-500);font-weight:400">(editable)</span></div>
+      <div class="alert alert-info" style="font-size:12px;margin:8px 0 12px">
+        Edit any payment field directly. Changes are saved when you click "Save Changes" below.
+        Use this to correct receipt numbers, amounts, dates, or verification status.
+      </div>
+      <div id="wr-edit-payments-list" style="margin-bottom:12px"></div>
+
+      <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
+      <div class="section-heading" style="font-size:14px">📋 Fine Records <span style="font-size:11px;color:var(--gray-500);font-weight:400">(editable)</span></div>
+      <div class="alert alert-info" style="font-size:12px;margin:8px 0 12px">
+        Edit any fine field directly. To revoke a fine, toggle the "Revoked" checkbox.
+      </div>
+      <div id="wr-edit-fines-list" style="margin-bottom:12px"></div>
+
+      <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0"/>
+      <div class="section-heading" style="font-size:14px;color:var(--danger)">🔐 Master Key Verification</div>
+      <div class="alert alert-danger" style="font-size:12px;margin:8px 0 12px">
+        Enter the master key to authorize this edit. All changes (including roll number and email) are permanently saved and logged.
+      </div>
+      <div class="field">
+        <label>Master Key <span class="req">*</span></label>
+        <div style="position:relative">
+          <input type="password" id="wr-edit-masterkey" placeholder="Enter master key" style="padding-right:40px"/>
+          <button type="button" onclick="togglePwd('wr-edit-masterkey','eye-wr-edit')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;z-index:2;font-size:18px" id="eye-wr-edit">👁</button>
+        </div>
+        <div class="err-msg hidden" id="err-wr-edit-masterkey"></div>
+      </div>
+
+      <div id="wr-edit-result" style="margin-top:12px"></div>
+      <button class="btn btn-danger" onclick="_wrEditSave()" id="wr-edit-save-btn" style="margin-top:10px">💾 Save Changes (Master Key Secured)</button>
+    </div>`;
+
+  // Hide placeholder once photo loads
+  const photoImg = document.getElementById('wr-edit-preview-photo');
+  if(photoImg) {
+    photoImg.onerror = () => {
+      photoImg.style.display = 'none';
+      document.getElementById('wr-edit-preview-photo-placeholder').style.display = 'flex';
+    };
+    photoImg.onload = () => {
+      photoImg.style.display = 'block';
+      document.getElementById('wr-edit-preview-photo-placeholder').style.display = 'none';
+    };
+  }
+
+  // v26.1 Bug 1: Render editable payments + fines lists
+  _wrEditRenderPayments(s);
+  _wrEditRenderFines(s);
+}
+
+function _wrEditRenderPayments(s) {
+  const container = document.getElementById('wr-edit-payments-list');
+  if(!container) return;
+  const payments = Array.isArray(s.payments) ? s.payments : [];
+  if(!payments.length) {
+    container.innerHTML = '<p style="color:var(--gray-400);font-size:13px;padding:8px 0">No payment records.</p>';
+    return;
+  }
+  container.innerHTML = payments.map((p, i) => {
+    const pt = p.paymentType || '';
+    const sem = p.semester || '';
+    const status = p.status || '';
+    const amount = p.amount || '';
+    const receipt = p.receipt || '';
+    const paidAt = p.paidAt || '';
+    const rejectionComment = p.rejectionComment || '';
+    const statusOpts = ['pending','approved','rejected','outstanding','settled']
+      .map(st => `<option value="${st}" ${status===st?'selected':''}>${st}</option>`).join('');
+    return `
+      <div style="border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;background:#fff">
+        <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Payment #${i+1} — ${_esc(pt)}${sem?' / '+_esc(sem):''}</div>
+        <div class="form-row" style="gap:8px">
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Payment Type</label>
+            <input type="text" data-pmt="${i}" data-field="paymentType" value="${_esc(pt)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Semester</label>
+            <input type="text" data-pmt="${i}" data-field="semester" value="${_esc(sem)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Amount (₹)</label>
+            <input type="number" data-pmt="${i}" data-field="amount" value="${_esc(amount)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Receipt No.</label>
+            <input type="text" data-pmt="${i}" data-field="receipt" value="${_esc(receipt)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Paid Date (YYYY-MM-DD)</label>
+            <input type="text" data-pmt="${i}" data-field="paidAt" value="${_esc(paidAt)}" placeholder="2026-01-15" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Status</label>
+            <select data-pmt="${i}" data-field="status" style="font-size:12px;padding:6px 8px">${statusOpts}</select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:11px">Rejection Comment (if any)</label>
+          <input type="text" data-pmt="${i}" data-field="rejectionComment" value="${_esc(rejectionComment)}" style="font-size:12px;padding:6px 8px"/>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function _wrEditRenderFines(s) {
+  const container = document.getElementById('wr-edit-fines-list');
+  if(!container) return;
+  const fines = Array.isArray(s.fines) ? s.fines : [];
+  if(!fines.length) {
+    container.innerHTML = '<p style="color:var(--gray-400);font-size:13px;padding:8px 0">No fine records.</p>';
+    return;
+  }
+  container.innerHTML = fines.map((f, i) => {
+    const amount = f.amount || '';
+    const reason = f.reason || '';
+    const form = f.form || '';
+    const date = f.date || '';
+    const revoked = f.revoked ? 'checked' : '';
+    const paid = f.paid ? 'checked' : '';
+    const verified = f.paymentVerified ? 'checked' : '';
+    const letterNo = f.letterNo || '';
+    return `
+      <div style="border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;background:#fff">
+        <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">Fine #${i+1} — ₹${_esc(amount)} ${_esc(form)}${revoked?' <span style="color:var(--danger)">(revoked)</span>':''}</div>
+        <div class="form-row" style="gap:8px">
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Amount (₹)</label>
+            <input type="number" data-fine="${i}" data-field="amount" value="${_esc(amount)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Form / Category</label>
+            <input type="text" data-fine="${i}" data-field="form" value="${_esc(form)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Date</label>
+            <input type="text" data-fine="${i}" data-field="date" value="${_esc(date)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:6px">
+          <label style="font-size:11px">Reason</label>
+          <input type="text" data-fine="${i}" data-field="reason" value="${_esc(reason)}" style="font-size:12px;padding:6px 8px"/>
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="field" style="margin-bottom:6px">
+            <label style="font-size:11px">Letter No.</label>
+            <input type="text" data-fine="${i}" data-field="letterNo" value="${_esc(letterNo)}" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div class="field" style="margin-bottom:6px;display:flex;align-items:center;gap:12px;padding-top:18px">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+              <input type="checkbox" data-fine="${i}" data-field="revoked" ${revoked} style="accent-color:var(--danger)"/> Revoked
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+              <input type="checkbox" data-fine="${i}" data-field="paid" ${paid} style="accent-color:var(--success)"/> Paid
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+              <input type="checkbox" data-fine="${i}" data-field="paymentVerified" ${verified} style="accent-color:var(--success)"/> Verified
+            </label>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function _wrEditSave() {
+  if(!_wrEditOriginalRoll) {
+    toast('Please search for a student first.', 'error');
+    return;
+  }
+  const masterKey = document.getElementById('wr-edit-masterkey')?.value || '';
+  if(!masterKey) {
+    showErr('wr-edit-masterkey', 'Master key is required to save changes.');
+    document.getElementById('err-wr-edit-masterkey')?.classList.remove('hidden');
+    return;
+  }
+  clearErr('wr-edit-masterkey');
+
+  // Read new roll number
+  const newNo = (document.getElementById('wr-edit-new-roll-no')?.value||'').trim();
+  const newBr = document.getElementById('wr-edit-new-roll-branch')?.value||'';
+  const newYr = (document.getElementById('wr-edit-new-roll-year')?.value||'').trim();
+  if(!newNo || !newBr || !newYr) {
+    toast('Roll number fields (Number / Branch / Year) are all required.', 'error');
+    return;
+  }
+  const newRollFull = `${newNo}/${newBr}/${newYr}`;
+
+  // Build updates object — only include fields that have changed
+  const updates = {};
+  if(newRollFull !== _wrEditOriginalRoll) updates.rollFull = newRollFull;
+
+  const name = document.getElementById('wr-edit-name')?.value.trim() || '';
+  if(name) updates.name = name;
+  const guardian = document.getElementById('wr-edit-guardian')?.value.trim() || '';
+  if(guardian) updates.guardianName = guardian;
+  const dob = document.getElementById('wr-edit-dob')?.value || '';
+  if(dob) updates.dob = dob;
+  const contact = document.getElementById('wr-edit-contact')?.value.trim() || '';
+  if(contact) updates.contactNo = contact;
+  const gcontact = document.getElementById('wr-edit-gcontact')?.value.trim() || '';
+  if(gcontact) updates.guardianContact = gcontact;
+  const email = document.getElementById('wr-edit-email')?.value.trim().toLowerCase() || '';
+  if(email) updates.email = email;
+  const district = document.getElementById('wr-edit-district')?.value.trim() || '';
+  if(district) updates.district = district;
+  const pin = document.getElementById('wr-edit-pin')?.value.trim() || '';
+  if(pin) updates.pin = pin;
+  const address = document.getElementById('wr-edit-address')?.value.trim() || '';
+  if(address) updates.address = address;
+  const admSess = document.getElementById('wr-edit-admission-session')?.value.trim() || '';
+  if(admSess) updates.admissionSession = admSess;
+  const semNo = document.getElementById('wr-edit-semester-no')?.value.trim() || '';
+  if(semNo) updates.semesterNo = semNo;
+  const status = document.getElementById('wr-edit-status')?.value || '';
+  if(status) updates.status = status;
+  const accessKey = document.getElementById('wr-edit-access-key')?.value.trim() || '';
+  if(accessKey) updates.accessKey = accessKey;
+  const renewalSem = document.getElementById('wr-edit-renewal-sem')?.value.trim() || '';
+  updates.renewalSemester = renewalSem;  // allow clearing
+
+  // Hostel info
+  const hostel = document.getElementById('wr-edit-hostel')?.value || '';
+  const room = document.getElementById('wr-edit-room')?.value.trim() || '';
+  const bed = document.getElementById('wr-edit-bed')?.value.trim() || '';
+  const chair = document.getElementById('wr-edit-chair')?.value.trim() || '';
+  const table = document.getElementById('wr-edit-table')?.value.trim() || '';
+  if(hostel) {
+    if(!room || !bed || !chair || !table) {
+      toast('When hostel block is set, room/bed/chair/table are all required.', 'error');
+      return;
+    }
+    updates.hostelInfo = {hostel, roomNo: room, bedNo: bed, chairNo: chair, tableNo: table};
+  } else {
+    updates.hostelInfo = null;  // clear accommodation
+  }
+
+  // v26.1 Bug 1: Collect edited payments
+  const pmtInputs = document.querySelectorAll('[data-pmt]');
+  if(pmtInputs.length) {
+    // Retrieve the original student (cached on the container by _wrEditRenderForm)
+    const container = document.getElementById('wr-edit-form-container');
+    let cachedStudent = null;
+    try {
+      const cached = container ? container.dataset.lastStudent : null;
+      if(cached) cachedStudent = JSON.parse(cached);
+    } catch(_) {}
+    const origPayments = (cachedStudent && Array.isArray(cachedStudent.payments)) ? cachedStudent.payments : [];
+    const pmtCount = Math.max(...Array.from(pmtInputs).map(el => parseInt(el.dataset.pmt, 10))) + 1;
+    const newPayments = [];
+    for(let i = 0; i < pmtCount; i++) {
+      const original = origPayments[i] || {};
+      const updated = {...original};
+      document.querySelectorAll(`[data-pmt="${i}"]`).forEach(el => {
+        const field = el.dataset.field;
+        let val = el.value;
+        if(el.type === 'checkbox') val = el.checked;
+        else if(el.type === 'number') val = val ? Number(val) : 0;
+        else val = String(val).trim();
+        updated[field] = val;
+      });
+      newPayments.push(updated);
+    }
+    updates.payments = newPayments;
+  }
+
+  // v26.1 Bug 1: Collect edited fines
+  const fineInputs = document.querySelectorAll('[data-fine]');
+  if(fineInputs.length) {
+    const container = document.getElementById('wr-edit-form-container');
+    let cachedStudent = null;
+    try {
+      const cached = container ? container.dataset.lastStudent : null;
+      if(cached) cachedStudent = JSON.parse(cached);
+    } catch(_) {}
+    const origFines = (cachedStudent && Array.isArray(cachedStudent.fines)) ? cachedStudent.fines : [];
+    const fineCount = Math.max(...Array.from(fineInputs).map(el => parseInt(el.dataset.fine, 10))) + 1;
+    const newFines = [];
+    for(let i = 0; i < fineCount; i++) {
+      const original = origFines[i] || {};
+      const updated = {...original};
+      document.querySelectorAll(`[data-fine="${i}"]`).forEach(el => {
+        const field = el.dataset.field;
+        let val = el.value;
+        if(el.type === 'checkbox') val = el.checked;
+        else if(el.type === 'number') val = val ? Number(val) : 0;
+        else val = String(val).trim();
+        updated[field] = val;
+      });
+      newFines.push(updated);
+    }
+    updates.fines = newFines;
+  }
+
+  const btn = document.getElementById('wr-edit-save-btn');
+  const resultEl = document.getElementById('wr-edit-result');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Saving…'; }
+  if(resultEl) resultEl.innerHTML = '';
+
+  try {
+    const r = await callBackend('wardenEditStudent', {
+      masterKey,
+      originalRoll: _wrEditOriginalRoll,
+      updates
+    });
+    if(btn) { btn.disabled = false; btn.innerHTML = '💾 Save Changes (Master Key Secured)'; }
+    if(r && r.success) {
+      toast('✅ Student record updated successfully.', 'success');
+      if(resultEl) resultEl.innerHTML = `<div class="alert alert-success" style="font-size:12.5px">✅ ${_esc(r.message || 'Student record updated successfully.')}<br/><small>Roll: ${_esc(_wrEditOriginalRoll)}${updates.rollFull ? ' → <strong>'+_esc(updates.rollFull)+'</strong>' : ''}</small></div>`;
+      // Update the warden's local cache
+      if(r.student) {
+        const idx = wrStudents.findIndex(x => x.rollFull === _wrEditOriginalRoll);
+        if(idx >= 0) wrStudents[idx] = r.student;
+        else if(updates.rollFull) {
+          // original may have been renamed — also try to find by new roll
+          const idx2 = wrStudents.findIndex(x => x.rollFull === updates.rollFull);
+          if(idx2 >= 0) wrStudents[idx2] = r.student;
+        }
+      }
+      // Refresh the form with the updated student
+      if(r.student) {
+        _wrEditOriginalRoll = r.student.rollFull;
+        // Update the search input to the new roll
+        const parts = String(r.student.rollFull).split('/');
+        const noEl = document.getElementById('wr-edit-roll-no');
+        const brEl = document.getElementById('wr-edit-roll-branch');
+        const yrEl = document.getElementById('wr-edit-roll-year');
+        if(noEl) noEl.value = parts[0] || '';
+        if(brEl) brEl.value = parts[1] || 'CSE';
+        if(yrEl) yrEl.value = parts[2] || '';
+        _wrEditRenderForm(r.student);
+        // Re-fetch photo
+        callBackend('getProfileImages', { rollFull: r.student.rollFull }).then(pr => {
+          if(pr && pr.success && pr.photo) {
+            _wrEditPhotoB64 = pr.photo;
+            const photoImg = document.getElementById('wr-edit-preview-photo');
+            if(photoImg) photoImg.src = 'data:image/jpeg;base64,' + pr.photo;
+          }
+        }).catch(()=>{});
+      }
+      renderWardenStats();
+    } else {
+      const errMsg = (r && r.error) || 'Failed to update student record.';
+      toast('Failed: ' + errMsg, 'error');
+      if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ ${_esc(errMsg)}</div>`;
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.innerHTML = '💾 Save Changes (Master Key Secured)'; }
+    toast('Error: ' + (e.message || 'Unknown'), 'error');
+    if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${_esc(e.message || 'Unknown')}</div>`;
+  }
+}
+
+
 // Fetches student info + photo and displays a preview card so the warden can
 // verify the student's identity before unlocking.
 let _wrUnlockPreviewStudent = null;
@@ -5872,14 +6596,31 @@ async function saveUpdate() {
     contactNo: document.getElementById('cs-upd-contact')?.value.trim(),
     guardianContact: document.getElementById('cs-upd-gcontact')?.value.trim()
   };
-  if(uploadedB64['cs-photo']) updates.photo = uploadedB64['cs-photo'];
-  if(uploadedB64['cs-sig'])   updates.signature = uploadedB64['cs-sig'];
+
+  // v26.1 Bug 4 FIX: The handleFile() function stores files in uploadedFiles[key]
+  // (NOT uploadedB64[key]) — base64 conversion is lazy. The old code read from
+  // uploadedB64['cs-photo'] / uploadedB64['cs-sig'] which were NEVER populated
+  // for the student Update tab, so photo/signature updates were silently
+  // dropped. Convert the File objects to base64 now before sending.
+  try {
+    if(uploadedFiles && uploadedFiles['cs-photo']) {
+      updates.photo = await fileToBase64(uploadedFiles['cs-photo']);
+    }
+  } catch(e) { console.warn('photo base64 failed', e); }
+  try {
+    if(uploadedFiles && uploadedFiles['cs-sig']) {
+      updates.signature = await fileToBase64(uploadedFiles['cs-sig']);
+    }
+  } catch(e) { console.warn('sig base64 failed', e); }
 
   const r = await callBackend('updateStudent', { rollFull: csStudent.rollFull, updates, status:'pending' });
   btn.disabled=false; btn.textContent='Save Changes';
 
   if(r.success) {
     toast('Profile updated! Pending warden re-approval.', 'success');
+    // Clear the uploaded files so they don't get re-sent on a subsequent save
+    if(uploadedFiles) { delete uploadedFiles['cs-photo']; delete uploadedFiles['cs-sig']; }
+    if(uploadedB64)   { delete uploadedB64['cs-photo'];   delete uploadedB64['cs-sig']; }
     // refresh
     const rd = await callBackend('getStudent', {rollFull: csStudent.rollFull});
     if(rd.success) { csStudent=rd.student; renderStudentProfile(); }
@@ -6394,7 +7135,7 @@ function wrTab(name) {
   // Actual HTML button order (verified):
   //   applications, students, fines, leaves, nodues, letters, grievances,
   //   unlock, datesettings, reports, messages, notices, debar
-  const TAB_ORDER = ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','messages','notices','debar'];
+  const TAB_ORDER = ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','messages','notices','editstudent','debar'];
   TAB_ORDER.forEach(t=>{
     const el = document.getElementById('wr-tab-'+t);
     if(el) el.classList.toggle('hidden', t!==name);
@@ -6423,6 +7164,7 @@ function wrTab(name) {
   else if(name==='reports') { /* data loaded on demand via Load buttons — Report 3 shares getDebars cache */ }
   else if(name==='notices') { loadWardenNotices(); }
   else if(name==='messages') { loadWardenSentMessages(); }
+  else if(name==='editstudent') { _wrEditReset(); }
   else if(name==='debar') { loadDebarTab(); }
   else if(name==='unlock') {
     // v25.8: Reset roll-number fields instead of email
