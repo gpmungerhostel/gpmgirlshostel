@@ -579,7 +579,9 @@
       <div style="font-size:40px;margin-bottom:6px">📥</div>
       <div class="card-title" style="margin:0">Download Provisional Allotment Letter</div>
       <div style="font-size:13px;color:var(--gray-600);margin-top:5px">
-        Enter your registered Email and the Access Key you set during application.
+        Verify your identity with your registered Email and Access Key.<br/>
+        <strong>If your letter is issued:</strong> you'll be guided to register on the Student Portal to download it.<br/>
+        <strong>If your application was rejected:</strong> you'll get an option to edit and re-submit.
       </div>
     </div>
 
@@ -606,7 +608,8 @@
         🔍 Verify &amp; Get Letter
       </button>
       <div style="margin-top:14px;padding:10px 12px;background:var(--gray-50);border-radius:var(--radius-md);font-size:12px;color:var(--gray-600)">
-        <strong>Application rejected?</strong> Enter your registered Email + Access Key above to see the rejection reason and edit your application.
+        <strong>Application rejected?</strong> Enter your registered Email + Access Key above to see the rejection reason and edit your application.<br/>
+        <strong>Letter already issued?</strong> You'll be asked to register on the Student Portal to download your letter.
       </div>
     </div>
 
@@ -2777,14 +2780,14 @@
 // ══════════════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════════════
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQnq2BybB-574zkdSHcQiuMYZhfiqpcjjdSus_gfx2gnPr/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzq_QiZK6mqc1S5Z4WNCS_clvNR36kCW7cCspGRzekHe-fZhFI_nG3h7w4DbUdhrDt7ng/exec";
 // Warden credentials are stored securely in the Google Sheet "Config" tab.
 // Do NOT put warden ID/password in this file — it is public on GitHub.
 
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v26.3';
+const EXPECTED_BACKEND_VERSION = 'v26.4';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -9597,7 +9600,11 @@ function renderStudentDocLinks(s) {
   if(!div) return;
   const dl = getDriveLinks(s);
   const items = [];
-  if(dl.provisionalLetter) items.push({label:'📋 Provisional Allotment Letter', url:dl.provisionalLetter, style:''});
+
+  // v26.4: Make the provisional letter download prominent with a highlighted button
+  if(dl.provisionalLetter) {
+    items.push({label:'📋 Download Provisional Allotment Letter', url:dl.provisionalLetter, style:'background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700;padding:10px 16px;font-size:13px'});
+  }
   if(dl.allotmentLetter)   items.push({label:'📄 Allotment Letter', url:dl.allotmentLetter, style:''});
   if(dl.noDuesCert)        items.push({label:'📄 No Dues Certificate', url:dl.noDuesCert, style:''});
   if(dl.hdnLetterLatest)   items.push({label:'📋 Fee Demand Notice (HDN)', url:dl.hdnLetterLatest, style:'background:#eff6ff;color:#1e40af;border-color:#bfdbfe'});
@@ -9606,7 +9613,7 @@ function renderStudentDocLinks(s) {
   div.innerHTML = `
     <div style="border-top:1px solid var(--gray-100);margin-top:14px;padding-top:14px">
       <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-600);margin-bottom:8px">Your Documents</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         ${items.map(it=>`<a href="${it.url}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;${it.style}">${it.label}</a>`).join('')}
       </div>
     </div>`;
@@ -12288,9 +12295,6 @@ async function verifyAndDownload() {
       </div>
       <button class="btn btn-primary" style="width:100%;font-size:14px;padding:13px;display:block;margin-bottom:12px" onclick="editRejectedAdmission()">
         ✏️ Edit Application &amp; Re-submit
-      </button>
-      <button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="dlReset()">
-        ← Back to Email Entry
       </button>`;
     document.getElementById('dl-step-verify').classList.add('hidden');
     document.getElementById('dl-step-result').classList.remove('hidden');
@@ -12298,7 +12302,10 @@ async function verifyAndDownload() {
     return;
   }
 
-  // Success — hide form, show download
+  // ─── SUCCESS: provisional letter issued → must register to download ──────
+  // v26.4: The download URL is NO LONGER shown on this public page.
+  // The student is instructed to register on the Student Portal and log in.
+  // The actual download link is available only from the logged-in Profile page.
   document.getElementById('dl-step-verify').classList.add('hidden');
 
   const statusLabel = {
@@ -12307,7 +12314,7 @@ async function verifyAndDownload() {
     approved:    { text:'Finally Approved',       color:'var(--success)', bg:'var(--success-bg)' },
   }[r.status] || { text: r.status, color:'var(--gray-600)', bg:'var(--gray-50)' };
 
-  // Build student info card (shown in both cases)
+  // Build student info card
   const infoCard = `
     <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
       <div style="font-size:12px;color:var(--gray-600);margin-bottom:2px">Student Name</div>
@@ -12318,45 +12325,36 @@ async function verifyAndDownload() {
       <div style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;color:${statusLabel.color};background:${statusLabel.bg}">${statusLabel.text}</div>
     </div>`;
 
-  if(r.linkMissing) {
-    // Verified OK but Drive link not yet saved — show a clear, actionable message
-    resultDiv.innerHTML = `
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:36px;margin-bottom:6px">✅</div>
-        <div style="font-size:15px;font-weight:700;color:var(--navy)">Identity Verified</div>
-      </div>
-      ${infoCard}
-      <div style="padding:14px 16px;background:#fff8e1;border:1.5px solid var(--warning);border-radius:var(--radius-md);font-size:13px;color:var(--navy);line-height:1.7;margin-bottom:12px">
-        <strong>📋 Register on the Student Portal to access your letter.</strong><br/>
-        Your provisional allotment has been approved. To download your Provisional Allotment Letter,
-        you need to <strong>register on the Student Portal</strong> using your Roll Number and registered email address.<br/><br/>
-        <strong>Steps:</strong><br/>
-        1. Go to <strong>Home → Student Portal</strong> (or click the button below).<br/>
-        2. Click <strong>Register</strong> and sign up with your Roll Number &amp; email.<br/>
-        3. After logging in, your Provisional Letter will be available to download from your dashboard.
-      </div>
-      <button class="btn btn-primary" style="width:100%;font-size:13px;margin-bottom:12px" onclick="showSection('continuing')">
-        🎓 Go to Student Portal
-      </button>`;
-  } else {
-    resultDiv.innerHTML = `
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:36px;margin-bottom:6px">✅</div>
-        <div style="font-size:15px;font-weight:700;color:var(--navy)">Verification Successful</div>
-      </div>
-      ${infoCard}
-      <a href="${r.provisionalLetterUrl}" target="_blank" rel="noopener noreferrer"
-         class="btn btn-primary" style="width:100%;text-align:center;font-size:14px;padding:13px;display:block;text-decoration:none;margin-bottom:12px">
-        📄 Download Provisional Allotment Letter
-      </a>
-      <div style="padding:12px 14px;background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:var(--radius-md);font-size:12px;color:var(--navy);line-height:1.6">
-        <strong>📋 Next Steps:</strong><br/>
-        1. Download and keep a copy of your Provisional Letter.<br/>
-        2. Pay the hostel fees at the College Cashier before the due date.<br/>
-        3. Register on the <strong>Student Portal</strong> using your Roll Number + registered email.<br/>
-        4. Submit your fee payment receipt through the portal to get final confirmation.
-      </div>`;
-  }
+  // v26.4: Show "must register" message with clear steps.
+  // The actual download link is only available from the student's logged-in Profile page.
+  const linkMissingNote = r.linkMissing
+    ? `<div style="margin-top:10px;padding:8px 12px;background:#fff8e1;border:1px solid var(--warning);border-radius:6px;font-size:12px;color:var(--warning)">
+        ⚠ Your letter PDF is being generated. If it's not available in your portal after registering, please contact the Hostel Office.
+      </div>`
+    : '';
+
+  resultDiv.innerHTML = `
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:36px;margin-bottom:6px">✅</div>
+      <div style="font-size:15px;font-weight:700;color:var(--navy)">Provisional Letter Issued!</div>
+    </div>
+    ${infoCard}
+    <div style="padding:16px 18px;background:#eef3ff;border:1.5px solid #c5d3f0;border-radius:var(--radius-md);font-size:13px;color:var(--navy);line-height:1.7;margin-bottom:16px">
+      <strong>🎓 Your Provisional Allotment Letter has been issued.</strong><br/><br/>
+      To download your letter, you must <strong>register on the Student Portal</strong> and log in.<br/>
+      This is a one-time registration — once done, you can access your letter and all future documents from your dashboard.
+      ${linkMissingNote}
+    </div>
+    <div style="padding:14px 16px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-md);font-size:12.5px;color:var(--gray-700);line-height:1.7;margin-bottom:16px">
+      <strong>📋 Steps to download your letter:</strong><br/>
+      <strong>1.</strong> Click the button below to go to the Student Portal.<br/>
+      <strong>2.</strong> Click <strong>Register</strong> and sign up with your <strong>Roll Number</strong> (${r.rollFull}) and the <strong>same email</strong> you used in your application.<br/>
+      <strong>3.</strong> After registering, <strong>log in</strong> with your email and new password.<br/>
+      <strong>4.</strong> Your <strong>Provisional Allotment Letter</strong> will be available to download from your Profile page.
+    </div>
+    <button class="btn btn-primary" style="width:100%;font-size:14px;padding:13px;display:block;margin-bottom:12px" onclick="showSection('continuing')">
+      🎓 Go to Student Portal &amp; Register
+    </button>`;
 
   document.getElementById('dl-step-result').classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'smooth' });
