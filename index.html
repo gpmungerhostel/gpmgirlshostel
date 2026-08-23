@@ -1359,7 +1359,7 @@
               <span style="font-size:22px">💳</span>
               <div>
                 <div style="font-family:'Playfair Display',serif;font-size:15px;color:#fff;font-weight:700">Panel 2 — Fee Payment Deadline for Provisional Students</div>
-                <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px">Auto-calculated: 5 days from Provisional Certificate issuance</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px">Auto-calculated: Application window last date (Panel 1)</div>
               </div>
             </div>
             <span id="dw-p2-badge" class="dw-status-badge" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)">— Loading —</span>
@@ -1367,7 +1367,7 @@
           <div style="padding:18px 20px">
             <div style="background:#d4edda;border:1px solid #b2dfdb;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#155724;display:flex;align-items:flex-start;gap:8px">
               <span style="font-size:16px;flex-shrink:0">🤖</span>
-              <div><strong>Auto-Calculated Deadline:</strong> When the Warden issues a Provisional Certificate, the system automatically sets the payment deadline to <strong>5 days from issuance</strong>. No manual date entry required. Late fine: ₹50/day, max ₹500 — visible to both student and Warden in real time.</div>
+              <div><strong>Auto-Calculated Deadline:</strong> When the Warden issues a Provisional Certificate, the system automatically sets the payment deadline to the <strong>application window last date</strong> (configured in Panel 1). The Warden can override this date if needed. Late fine: ₹50/day, max ₹500 — visible to both student and Warden in real time.</div>
             </div>
             <!-- Read-only info table showing current provisional deadlines -->
             <div style="background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:14px;margin-bottom:12px">
@@ -2787,7 +2787,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v26.4';
+const EXPECTED_BACKEND_VERSION = 'v28.1';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -8028,7 +8028,7 @@ function _renderProvisionalDeadlines(students) {
       <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Roll No.</th>
       <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Name</th>
       <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Issued On</th>
-      <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Deadline (5-day)</th>
+      <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Deadline</th>
       <th style="padding:7px 10px;text-align:left;color:var(--gray-600);font-weight:600">Status</th>
       <th style="padding:7px 10px;text-align:right;color:var(--gray-600);font-weight:600">Fine</th>
     </tr></thead><tbody>`;
@@ -8345,12 +8345,13 @@ async function doApproveStudent(rollFull) {
   };
 
   // Client-side room capacity check (backend also validates)
+  // v26.4: Exclude alumni — their room is considered vacant.
   const roomOccupants = wrStudents.filter(s =>
     s.rollFull !== rollFull &&
     s.hostelInfo &&
     s.hostelInfo.hostel === hostelInfo.hostel &&
     s.hostelInfo.roomNo === hostelInfo.roomNo &&
-    (s.status === 'approved' || s.status === 'alumni')
+    s.status !== 'alumni' // alumni rooms are vacant
   );
   if(roomOccupants.length >= 3) {
     btn.disabled=false; btn.innerHTML='✓ Approve &amp; Issue Allotment Letter';
@@ -9589,10 +9590,34 @@ function openRulesPDF() {
 
 // ─── STUDENT DOCUMENT LINKS ──────────────────────────────────────────────────
 // Safely parse driveLinks regardless of whether it's already an object or a JSON string
+// v28.0: Clean Drive URLs — strip ?usp=drivesdk and normalise to /file/d/ID/view
+function _cleanDriveUrl(url) {
+  if(!url || typeof url !== 'string') return url;
+  url = url.trim();
+  if(!url.includes('drive.google.com')) return url;
+  let fileId = '';
+  const m1 = url.match(/\/file\/d\/([-\w]+)/);
+  if(m1) fileId = m1[1];
+  if(!fileId) { const m2 = url.match(/[?&]id=([-\w]+)/); if(m2) fileId = m2[1]; }
+  if(!fileId) { const m3 = url.match(/open\?id=([-\w]+)/); if(m3) fileId = m3[1]; }
+  if(fileId) return 'https://drive.google.com/file/d/' + fileId + '/view';
+  return url.split('?')[0];
+}
+
 function getDriveLinks(s) {
   if(!s || !s.driveLinks) return {};
-  if(typeof s.driveLinks === 'object') return s.driveLinks;
-  try { return JSON.parse(s.driveLinks); } catch(_) { return {}; }
+  let dl;
+  if(typeof s.driveLinks === 'object') dl = s.driveLinks;
+  else { try { dl = JSON.parse(s.driveLinks); } catch(_) { return {}; } }
+  // v28.0: Clean all Drive URLs to fix the ?usp=drivesdk permission issue
+  if(dl && typeof dl === 'object') {
+    for(const key in dl) {
+      if(typeof dl[key] === 'string' && dl[key].includes('drive.google.com')) {
+        dl[key] = _cleanDriveUrl(dl[key]);
+      }
+    }
+  }
+  return dl;
 }
 
 function renderStudentDocLinks(s) {
@@ -9926,7 +9951,7 @@ async function loadMyLeaves() {
     const statusClass=lv.status==='approved'?'badge-approved':lv.status==='rejected'?'badge-rejected':'badge-pending';
     const statusLabel=lv.status==='approved'?'Approved':lv.status==='rejected'?'Rejected':'Pending';
     const downloadBtn = lv.status==='approved'&&lv.driveUrl
-      ? `<a href="${lv.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;margin-top:6px">📄 Download Approval Letter</a>` : '';
+      ? `<a href="${_cleanDriveUrl(lv.driveUrl)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;margin-top:6px">📄 Download Approval Letter</a>` : '';
     const rejNote = lv.status==='rejected'&&lv.rejectionReason
       ? `<div style="font-size:11px;color:var(--danger);margin-top:4px">Reason: ${lv.rejectionReason}</div>` : '';
     return `<div style="border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px;margin-bottom:10px">
@@ -10171,7 +10196,7 @@ async function renderWardenLetters() {
             <div style="font-weight:600;font-size:13px">${l.studentName} <span style="font-size:11px;color:var(--gray-400)">${l.rollFull}</span></div>
             <div style="font-size:11px;color:var(--gray-600)">${l.leaveId} · ${fmtDMY(l.departureDt)} → ${fmtDMY(l.returnDt)} · ${l.reason}</div>
           </div>
-          <a href="${l.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Leave Letter</a>
+          <a href="${_cleanDriveUrl(l.driveUrl)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Leave Letter</a>
         </div>`).join('');
     } else if(!q) {
       html += `<div class="alert alert-info" style="margin-top:12px">No approved leave letters issued yet.</div>`;
@@ -10223,7 +10248,7 @@ async function loadWardenLeaves() {
     const dlBtn = l.status==='approved'
       ? (l.driveUrl
           ? `<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-               <a href="${l.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Download</a>
+               <a href="${_cleanDriveUrl(l.driveUrl)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Download</a>
                <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="regenLeavePDF('${l.leaveId}',this)">🔄 Re-generate PDF</button>
              </div>`
           : `<button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="regenLeavePDF('${l.leaveId}',this)">📄 Generate PDF</button>`)
@@ -10278,7 +10303,7 @@ function wrFilterLeaves() {
     const dlBtn = l.status==='approved'
       ? (l.driveUrl
           ? `<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-               <a href="${l.driveUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Download</a>
+               <a href="${_cleanDriveUrl(l.driveUrl)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px">📄 Download</a>
                <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="regenLeavePDF('${l.leaveId}',this)">🔄 Re-generate PDF</button>
              </div>`
           : `<button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="regenLeavePDF('${l.leaveId}',this)">📄 Generate PDF</button>`)
@@ -12352,7 +12377,7 @@ async function verifyAndDownload() {
       <strong>3.</strong> After registering, <strong>log in</strong> with your email and new password.<br/>
       <strong>4.</strong> Your <strong>Provisional Allotment Letter</strong> will be available to download from your Profile page.
     </div>
-    <button class="btn btn-primary" style="width:100%;font-size:14px;padding:13px;display:block;margin-bottom:12px" onclick="showSection('continuing')">
+    <button class="btn btn-primary" style="width:100%;font-size:14px;padding:13px;display:block;margin-bottom:12px" onclick="showSection('continuing'); authTab('register');">
       🎓 Go to Student Portal &amp; Register
     </button>`;
 
@@ -13297,9 +13322,6 @@ function _wrDebarStudentClear() {
   if(ddEl) ddEl.style.display = 'none';
   if(infoEl) infoEl.classList.add('hidden');
 }
-
-// Kept for backward compatibility — no-op now (searchable input replaces dropdown)
-function populateDebarStudentDropdown() { /* no-op in v25.8 */ }
 
 function renderDebarSemCheckboxes() {
   const container = document.getElementById('wr-debar-sem-checkboxes');
