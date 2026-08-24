@@ -329,7 +329,7 @@
         <div class="home-card-icon" style="background:#fff8e6">📥</div>
         <div>
           <div class="home-card-title">Download Provisional Letter</div>
-          <div class="home-card-desc">Already applied? Download your Provisional Allotment Letter using your registered Email + Access Key</div>
+          <div class="home-card-desc">Already applied? Check your application status using your Roll Number, Email, and Guardian's Mobile Number</div>
         </div>
       </div>
       <div class="home-card-arrow">›</div>
@@ -475,15 +475,16 @@
     </div>
   </div>
 
-  <!-- Step 2: Signature + Access Key + Submit (was Step 3) -->
+  <!-- Step 2: Signature + Submit (was Step 3) -->
   <div id="ns-step-2" class="card hidden">
     <div class="card-title">Signature & Submit</div>
     <div class="card-subtitle">Step 3 of 3 — Final Step</div>
     <div class="alert alert-info" style="margin-bottom:16px;font-size:13px">
       <strong>📋 What happens next?</strong><br/>
       Your application will be sent directly to the Warden for review. Once approved, you will receive a
-      <strong>Provisional Hostel Allotment Letter</strong> which you can download using your
-      Roll Number + Access Key (set below). You do <strong>not</strong> need a portal account to download it.
+      <strong>Provisional Hostel Allotment Letter</strong>. You can check your application status and download
+      the letter from the Home page by entering your <strong>Roll Number, Email, and Guardian's Mobile Number</strong>.
+      You will then need to register on the Student Portal to download the letter.
       Fee payment is required after downloading the letter.
     </div>
 
@@ -495,35 +496,6 @@
       </div>
       <input type="file" id="file-sig" accept="image/jpeg,image/png" class="hidden" onchange="handleFile('sig',20,100)"/>
       <div class="err-msg hidden" id="err-sig"></div>
-    </div>
-
-    <hr style="border:none;border-top:1px solid var(--gray-100);margin:18px 0"/>
-
-    <div style="background:var(--gold-pale);border:1.5px solid var(--gold-light);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:5px">🔑 Set Your Letter Access Key</div>
-      <div style="font-size:12px;color:var(--gray-700);line-height:1.55;margin-bottom:12px">
-        Choose a personal <strong>Access Key</strong> (min 4 characters — letters, numbers, or a word you'll remember).
-        You will need this key <strong>along with your registered Email</strong> to download your Provisional
-        Allotment Letter once the Warden approves your application. <strong>Keep it safe — it cannot be recovered.</strong>
-      </div>
-      <div class="field" style="margin-bottom:10px">
-        <label>Access Key <span class="req">*</span></label>
-        <div style="position:relative">
-          <input type="password" id="ns-access-key" placeholder="e.g. MyKey2025 or 4-digit PIN"
-            autocomplete="new-password" maxlength="32"
-            style="padding-right:44px;font-size:15px;letter-spacing:1px"/>
-          <button type="button" onclick="togglePwd('ns-access-key','ns-key-eye')"
-            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray-600);padding:4px;z-index:2" id="ns-key-eye">👁</button>
-        </div>
-        <div class="hint" style="margin-top:5px">4–32 characters. You will use this to download your provisional letter.</div>
-        <div class="err-msg hidden" id="err-ns-access-key"></div>
-      </div>
-      <div class="field" style="margin-bottom:0">
-        <label>Confirm Access Key <span class="req">*</span></label>
-        <input type="password" id="ns-access-key-confirm" placeholder="Re-enter Access Key"
-          autocomplete="new-password" maxlength="32" style="font-size:15px;letter-spacing:1px"/>
-        <div class="err-msg hidden" id="err-ns-access-key-confirm"></div>
-      </div>
     </div>
 
     <div class="alert alert-info" style="margin-top:4px;font-size:12px">
@@ -549,13 +521,13 @@
       <p>Your application has been sent to the Warden for provisional approval.<br/>
          Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>
          <span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">
-           Your registered Email + your Access Key
+           Your Roll Number, Email, and Guardian's Mobile Number
          </span>
       </p>
       <div class="ref-box" id="ns-ref-display"></div>
       <div id="ns-success-download-hint" style="margin-top:14px;padding:12px 16px;background:var(--gold-pale);border:1px solid var(--gold-light);border-radius:var(--radius-md);font-size:13px;text-align:left">
         <strong>📥 To download your letter later:</strong><br/>
-        Go to <em>Home → Download Provisional Letter</em> and enter your registered Email + Access Key.
+        Go to <em>Home → Download Provisional Letter</em> and enter your Roll Number, Email, and Guardian's Mobile Number.
       </div>
       <br/>
       <button class="btn btn-primary" id="ns-success-back-btn" onclick="nsSuccessBack()">← Back to Home</button>
@@ -579,7 +551,7 @@
       <div style="font-size:40px;margin-bottom:6px">📥</div>
       <div class="card-title" style="margin:0">Download Provisional Allotment Letter</div>
       <div style="font-size:13px;color:var(--gray-600);margin-top:5px">
-        Verify your identity with your registered Email and Access Key.<br/>
+        Verify your identity with your <strong>Roll Number, Email, and Guardian's Mobile Number</strong>.<br/>
         <strong>If your letter is issued:</strong> you'll be guided to register on the Student Portal to download it.<br/>
         <strong>If your application was rejected:</strong> you'll get an option to edit and re-submit.
       </div>
@@ -588,27 +560,37 @@
     <!-- Step 1: verify credentials -->
     <div id="dl-step-verify">
       <div class="field">
+        <label>Roll Number <span class="req">*</span></label>
+        <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+          <input type="text" id="dl-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                 oninput="_sanitizeEnglishInput(this)" style="text-align:center;font-weight:600"/>
+          <select id="dl-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+            <option>CE</option><option selected>CSE</option><option>EE</option>
+            <option>EC</option><option>FTS</option><option>ME</option>
+          </select>
+          <input type="text" id="dl-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                 oninput="_sanitizeEnglishInput(this)" style="text-align:center;font-weight:600"/>
+        </div>
+        <div class="err-msg hidden" id="err-dl-roll"></div>
+      </div>
+      <div class="field">
         <label>Registered Email <span class="req">*</span></label>
         <input type="email" id="dl-email" placeholder="e.g. student@college.edu"
           autocomplete="off"/>
         <div class="err-msg hidden" id="err-dl-email"></div>
       </div>
       <div class="field">
-        <label>Access Key <span class="req">*</span></label>
-        <div style="position:relative">
-          <input type="password" id="dl-access-key" placeholder="Your personal Access Key"
-            autocomplete="off" style="padding-right:44px"/>
-          <button type="button" onclick="togglePwd('dl-access-key','dl-key-eye')"
-            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray-600);padding:4px;z-index:2" id="dl-key-eye">👁</button>
-        </div>
-        <div class="err-msg hidden" id="err-dl-access-key"></div>
+        <label>Guardian's Mobile Number <span class="req">*</span></label>
+        <input type="text" id="dl-guardian-mobile" placeholder="e.g. 9876543210" maxlength="10"
+          autocomplete="off"/>
+        <div class="err-msg hidden" id="err-dl-guardian-mobile"></div>
       </div>
       <div class="err-msg hidden" id="err-dl-verify" style="margin-bottom:12px"></div>
       <button class="btn btn-primary" style="width:100%" onclick="verifyAndDownload()" id="dl-verify-btn">
         🔍 Verify &amp; Get Letter
       </button>
       <div style="margin-top:14px;padding:10px 12px;background:var(--gray-50);border-radius:var(--radius-md);font-size:12px;color:var(--gray-600)">
-        <strong>Application rejected?</strong> Enter your registered Email + Access Key above to see the rejection reason and edit your application.<br/>
+        <strong>Application rejected?</strong> Enter your Roll Number, Email, and Guardian's Mobile above to see the rejection reason and edit your application.<br/>
         <strong>Letter already issued?</strong> You'll be asked to register on the Student Portal to download your letter.
       </div>
     </div>
@@ -1026,6 +1008,7 @@
         <button class="tab-btn" onclick="wrTab('notices')" id="wr-tab-btn-notices">📢 Notices</button>
 
         <button class="tab-btn" onclick="wrTab('editstudent')" id="wr-tab-btn-editstudent">✏️ Edit Student</button>
+        <button class="tab-btn" onclick="wrTab('alumni')" id="wr-tab-btn-alumni">🎓 Alumni</button>
         <button class="tab-btn" onclick="wrTab('debar')" id="wr-tab-btn-debar">🚫 Debar Students</button>
       </div>
 
@@ -1556,6 +1539,24 @@
 
         <!-- Global save result for legacy compat -->
         <div id="dw-save-result" style="margin-top:4px"></div>
+
+        <!-- v29.0: One-time Fix All Drive Sharing -->
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:24px 0 16px"/>
+        <div class="section-heading" style="font-size:14px;color:var(--danger)">🔧 Fix All Drive Sharing (One-Time Tool)</div>
+        <div class="alert alert-warning" style="font-size:12px;margin:8px 0 12px">
+          This one-time tool fixes the "Drive permission" error for ALL existing student PDFs (provisional letters, allotment letters, no dues certificates, HDNs, and leave approval letters).
+          It sets sharing to "Anyone with link — View" on every PDF file in Drive, and cleans all stored URLs.
+          <strong>Run this once after deploying v29.0.</strong> Requires the master key.
+        </div>
+        <div class="field">
+          <label>Master Key <span class="req">*</span></label>
+          <div style="position:relative">
+            <input type="password" id="wr-fixsharing-masterkey" placeholder="Enter master key" style="padding-right:40px;max-width:300px"/>
+            <button type="button" onclick="togglePwd('wr-fixsharing-masterkey','eye-wr-fixsharing')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;z-index:2;font-size:18px" id="eye-wr-fixsharing">👁</button>
+          </div>
+        </div>
+        <button class="btn btn-danger" onclick="_wrFixAllDriveSharing()" id="wr-fixsharing-btn" style="margin-top:6px">🔧 Fix All Drive Sharing Now</button>
+        <div id="wr-fixsharing-result" style="margin-top:12px"></div>
 
       </div><!-- end wr-tab-datesettings -->
 
@@ -2102,6 +2103,79 @@
 
         <!-- Student preview + edit form (populated after search) -->
         <div id="wr-edit-form-container"></div>
+
+        <!-- v30.1: Delete Student — search + verify first, then delete (master-key secured) -->
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:24px 0 16px"/>
+        <div class="section-heading" style="font-size:14px;color:var(--danger)">🗑 Delete Student Record</div>
+        <div class="alert alert-danger" style="font-size:12px;margin:8px 0 12px">
+          ⚠ <strong>PERMANENT deletion.</strong> Search for the student first to verify their identity, then enter the master key to delete. This removes the student from ALL sheets and trashes their Drive folder. This cannot be undone.
+        </div>
+        <!-- Step 1: Search student -->
+        <div class="field">
+          <label>Student Roll Number <span class="req">*</span></label>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+            <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+              <input type="text" id="wr-del-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrDeleteSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+              <select id="wr-del-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+                <option>CE</option><option selected>CSE</option><option>EE</option>
+                <option>EC</option><option>FTS</option><option>ME</option>
+              </select>
+              <input type="text" id="wr-del-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrDeleteSearchStudent();}"
+                     style="text-align:center;font-weight:600"/>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="_wrDeleteSearchStudent()" id="wr-del-search-btn" style="white-space:nowrap">🔍 Search Student</button>
+          </div>
+          <div class="err-msg hidden" id="err-wr-del-roll"></div>
+        </div>
+        <!-- Step 2: Student preview (shown after search) -->
+        <div id="wr-del-preview" style="margin-bottom:16px"></div>
+        <!-- Step 3: Master key + delete button (shown after search confirms student) -->
+        <div id="wr-del-confirm-section" class="hidden">
+          <div class="field">
+            <label>Master Key <span class="req">*</span></label>
+            <div style="position:relative">
+              <input type="password" id="wr-del-masterkey" placeholder="Enter master key" style="padding-right:40px"/>
+              <button type="button" onclick="togglePwd('wr-del-masterkey','eye-wr-del')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;z-index:2;font-size:18px" id="eye-wr-del">👁</button>
+            </div>
+          </div>
+          <button class="btn btn-danger" onclick="_wrDeleteStudent()" id="wr-del-btn">🗑 Delete Student Permanently</button>
+        </div>
+        <div id="wr-del-result" style="margin-top:12px"></div>
+      </div>
+
+      <!-- v31.0: Alumni Tab -->
+      <div id="wr-tab-alumni" class="hidden">
+        <div class="section-heading">🎓 Alumni Records</div>
+        <div class="alert alert-info" style="margin-bottom:16px;font-size:13px">
+          When a student's No Dues is issued, they become alumni and their record is <strong>archived</strong> to the Alumni sheet and removed from the active Students sheet. This keeps the portal fast. Search for an alumni student's record by entering their roll number below.
+        </div>
+        <div class="field">
+          <label>Student Roll Number <span class="req">*</span></label>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+            <div style="display:grid;grid-template-columns:64px 90px 84px;gap:8px">
+              <input type="text" id="wr-alumni-roll-no" maxlength="3" placeholder="25" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrAlumniSearch();}"
+                     style="text-align:center;font-weight:600"/>
+              <select id="wr-alumni-roll-branch" style="width:100%;padding:10px 8px;font-weight:600;text-align:center">
+                <option>CE</option><option selected>CSE</option><option>EE</option>
+                <option>EC</option><option>FTS</option><option>ME</option>
+              </select>
+              <input type="text" id="wr-alumni-roll-year" maxlength="4" placeholder="2026" inputmode="text" autocomplete="off"
+                     oninput="_sanitizeEnglishInput(this)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();_wrAlumniSearch();}"
+                     style="text-align:center;font-weight:600"/>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="_wrAlumniSearch()" id="wr-alumni-search-btn" style="white-space:nowrap">🔍 Search Alumni</button>
+          </div>
+          <div class="err-msg hidden" id="err-wr-alumni-roll"></div>
+        </div>
+        <div id="wr-alumni-result" style="margin-top:16px"></div>
       </div>
 
 
@@ -2787,7 +2861,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v28.1';
+const EXPECTED_BACKEND_VERSION = 'v31.0';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -3389,7 +3463,6 @@ function nsShowPreview() {
   const session = (document.getElementById('ns-semester')?.value || '').trim();
   const hasNewPhoto = !!uploadedFiles['photo'];
   const hasNewSig = !!uploadedFiles['sig'];
-  const accessKeyVal = document.getElementById('ns-access-key')?.value || '';
 
   // Format DOB for display
   let dobDisplay = dob;
@@ -3421,20 +3494,6 @@ function nsShowPreview() {
     sigHtml = '<span style="color:var(--danger)">Not uploaded</span>';
   }
 
-  // Build access key preview HTML
-  let accessKeyHtml;
-  if(accessKeyVal) {
-    // Mask the access key — show first 1 and last 1 character, mask the rest
-    const masked = accessKeyVal.length <= 2
-      ? '*'.repeat(accessKeyVal.length)
-      : accessKeyVal[0] + '*'.repeat(accessKeyVal.length - 2) + accessKeyVal[accessKeyVal.length-1];
-    accessKeyHtml = `<span style="font-family:monospace;font-size:14px;font-weight:600;color:var(--success);background:var(--success-bg);padding:3px 10px;border-radius:var(--radius-sm)">${masked}</span>
-      <span style="font-size:11px;color:var(--gray-500);margin-left:6px">(${accessKeyVal.length} characters)</span>`;
-  } else if(_editingRejectedAdmission) {
-    accessKeyHtml = '<span style="color:var(--gray-500)">Existing key will be kept (not changed)</span>';
-  } else {
-    accessKeyHtml = '<span style="color:var(--danger)">Not set</span>';
-  }
 
   // Build preview HTML
   const previewEl = document.getElementById('ns-step-preview');
@@ -3473,7 +3532,6 @@ function nsShowPreview() {
       <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">PIN Code</td><td style="padding:8px 12px">${pin}</td></tr>
       <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Address</td><td style="padding:8px 12px">${address || '—'}</td></tr>
       <tr style="background:var(--gray-50)"><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Admission Session</td><td style="padding:8px 12px">${session}</td></tr>
-      <tr><td style="padding:8px 12px;font-weight:700;color:var(--navy)">Access Key</td><td style="padding:8px 12px">${accessKeyHtml}</td></tr>
     </table>
     <div class="err-msg hidden" id="ns-preview-error" style="margin-bottom:12px;font-size:13px;color:var(--danger);background:var(--danger-bg);padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--danger)"></div>
     <div class="btn-row">
@@ -3576,7 +3634,6 @@ async function nsDoSubmit(btnEl) {
       pin: getVal('ns-pin'),
       address: getVal('ns-address'),
       admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
-      accessKey: document.getElementById('ns-access-key')?.value || '',
       photo: uploadedB64['photo'] || '',
       signature: uploadedB64['sig'] || ''
     };
@@ -3625,7 +3682,6 @@ async function nsDoSubmit(btnEl) {
       address: toSentenceCase(getVal('ns-address')),
       admissionSession: (document.getElementById('ns-semester')?.value || '').trim(),
       semesterNo: (document.getElementById('ns-semester')?.value || '').trim(),
-      accessKey: document.getElementById('ns-access-key')?.value || '',
       photo: uploadedB64['photo'],
       signature: uploadedB64['sig'],
       status: 'new_pending',
@@ -3645,7 +3701,7 @@ async function nsDoSubmit(btnEl) {
       if(successPara) successPara.innerHTML = 'Your application has been sent to the Warden for provisional approval.<br/>'+
         'Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>'+
         '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
-        'Your registered Email + your Access Key</span>';
+        'Your Roll Number + Email + Guardian Mobile Number</span>';
       if(downloadHint) downloadHint.style.display = '';
       document.getElementById('ns-step-preview').classList.add('hidden');
       for(let i=0;i<3;i++) { const s=document.getElementById('ns-step-'+i); if(s) s.classList.add('hidden'); }
@@ -3701,33 +3757,6 @@ function nsValidate(step) {
   if(step === 2) {
     // In edit mode, signature is optional
     if(!_editingRejectedAdmission && !uploadedFiles['sig']) { showErr('sig','Signature image is required'); ok=false; } else clearErr('sig');
-    // Access Key
-    const ak = document.getElementById('ns-access-key')?.value || '';
-    const akc = document.getElementById('ns-access-key-confirm')?.value || '';
-    if(_editingRejectedAdmission) {
-      // In edit mode, access key is optional (keep existing)
-      if(ak === '') {
-        clearErr('ns-access-key');
-        clearErr('ns-access-key-confirm');
-      } else {
-        if(ak.length < 4) { showErr('ns-access-key','New Access Key must be at least 4 characters'); ok=false; }
-        else if(ak.length > 32) { showErr('ns-access-key','New Access Key must be at most 32 characters'); ok=false; }
-        else {
-          clearErr('ns-access-key');
-          if(ak !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); ok=false; }
-          else clearErr('ns-access-key-confirm');
-        }
-      }
-    } else {
-      // New application — access key is required
-      if(ak.length < 4) { showErr('ns-access-key','Access Key must be at least 4 characters'); ok=false; }
-      else if(ak.length > 32) { showErr('ns-access-key','Access Key must be at most 32 characters'); ok=false; }
-      else clearErr('ns-access-key');
-      if(ok || ak.length >= 4) {
-        if(ak !== akc) { showErr('ns-access-key-confirm','Access Keys do not match'); ok=false; }
-        else clearErr('ns-access-key-confirm');
-      }
-    }
   }
   return ok;
 }
@@ -3803,7 +3832,7 @@ function editRejectedAdmission() {
     '<div class="file-icon" id="icon-sig">✍️</div><div class="file-info"><p id="fname-sig">Current signature on file (click to replace)</p><small id="fsize-sig">20 KB – 100 KB</small></div>';
 
   // Clear any previous errors
-  ['ns-name','ns-guardian','ns-roll','ns-dob','photo','ns-contact','ns-gcontact','ns-email','ns-pin','ns-semester','sig','ns-access-key','ns-access-key-confirm','ns-submit'].forEach(id => {
+  ['ns-name','ns-guardian','ns-roll','ns-dob','photo','ns-contact','ns-gcontact','ns-email','ns-pin','ns-semester','sig','ns-submit'].forEach(id => {
     const el = document.getElementById('err-'+id);
     if(el) el.classList.add('hidden');
   });
@@ -3954,7 +3983,7 @@ function nsResetForm() {
   // Clear all input fields
   ['ns-name','ns-guardian','ns-roll-no','ns-roll-year','ns-dob',
    'ns-contact','ns-gcontact','ns-email','ns-pin','ns-address',
-   'ns-access-key','ns-access-key-confirm','ns-semester'].forEach(id => {
+   'ns-semester'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
@@ -3971,7 +4000,7 @@ function nsResetForm() {
   // Clear all error messages
   ['ns-name','ns-guardian','ns-roll','ns-dob','photo',
    'ns-contact','ns-gcontact','ns-email','ns-pin','ns-semester',
-   'sig','ns-access-key','ns-access-key-confirm','ns-submit'].forEach(id => {
+   'sig','ns-submit'].forEach(id => {
     const el = document.getElementById('err-'+id);
     if(el) el.classList.add('hidden');
   });
@@ -4005,7 +4034,7 @@ function nsResetForm() {
   if(step2Banner) step2Banner.innerHTML = '<strong>📋 What happens next?</strong><br/>'+
     'Your application will be sent directly to the Warden for review. Once approved, you will receive a '+
     '<strong>Provisional Hostel Allotment Letter</strong> which you can download using your '+
-    'Roll Number + Access Key (set below). You do <strong>not</strong> need a portal account to download it. '+
+    'Roll Number + Email + Guardian Mobile Number. You will need to register on the portal to download it. '+
     'Fee payment is required after downloading the letter.';
 
   // Reset submit button text
@@ -4020,7 +4049,7 @@ function nsResetForm() {
   if(successPara) successPara.innerHTML = 'Your application has been sent to the Warden for provisional approval.<br/>'+
     'Once approved, you can download your <strong>Provisional Allotment Letter</strong> using:<br/>'+
     '<span style="display:inline-block;margin-top:8px;font-size:13px;color:var(--navy)">'+
-    'Your registered Email + your Access Key</span>';
+    'Your Roll Number + Email + Guardian Mobile Number</span>';
   if(downloadHint) downloadHint.style.display = '';
 
   // Hide success and preview screens
@@ -6679,6 +6708,253 @@ function wardenLogout() {
   wrDataLoaded=false;
 }
 
+
+// v31.0: Alumni record search
+async function _wrAlumniSearch() {
+  const dno  = (document.getElementById('wr-alumni-roll-no')?.value||'').trim();
+  const dbr  = document.getElementById('wr-alumni-roll-branch')?.value||'';
+  const dyr  = (document.getElementById('wr-alumni-roll-year')?.value||'').trim();
+  const rollFull = dno && dbr && dyr ? dno + '/' + dbr + '/' + dyr : '';
+  const resultEl = document.getElementById('wr-alumni-result');
+  const searchBtn = document.getElementById('wr-alumni-search-btn');
+
+  if(!rollFull) {
+    if(resultEl) resultEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter all three roll number fields.</div>';
+    return;
+  }
+
+  if(searchBtn) { searchBtn.disabled = true; searchBtn.innerHTML = '<span class="spinner spinner-dark"></span> Searching…'; }
+  if(resultEl) resultEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Searching alumni records…</div>';
+
+  try {
+    const r = await callBackend('getAlumniRecord', { rollFull });
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Alumni'; }
+
+    if(!r || !r.success) {
+      if(resultEl) resultEl.innerHTML = `<div class="alert alert-info" style="font-size:12.5px">ℹ ${r && r.error ? r.error : 'No alumni record found.'}</div>`;
+      return;
+    }
+
+    const a = r.alumni;
+    const hi = a.hostelInfo || {};
+    const roomStr = hi.hostel ? `${hi.hostel} · Room ${hi.roomNo||'—'} · Bed ${hi.bedNo||'—'} · Chair ${hi.chairNo||'—'} · Table ${hi.tableNo||'—'}` : 'Not allotted';
+    const alumniDate = a.alumniDate ? _fmtDispDDMMYYYY(a.alumniDate) : '—';
+    const dl = a.driveLinks || {};
+    let docLinks = '';
+    if(dl.provisionalLetter) docLinks += `<a href="${_cleanDriveUrl(dl.provisionalLetter)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px">📋 Provisional Letter</a>`;
+    if(dl.allotmentLetter)   docLinks += `<a href="${_cleanDriveUrl(dl.allotmentLetter)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px">📄 Allotment Letter</a>`;
+    if(dl.noDuesCert)        docLinks += `<a href="${_cleanDriveUrl(dl.noDuesCert)}" target="_blank" class="btn btn-gold btn-sm" style="font-size:11px">📄 No Dues Certificate</a>`;
+    if(!docLinks) docLinks = '<span style="color:var(--gray-400);font-size:12px">No document links available</span>';
+
+    if(resultEl) resultEl.innerHTML = `
+      <div style="border:1.5px solid var(--gray-200);border-radius:var(--radius-md);padding:16px;background:#fafbfc">
+        <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🎓 Alumni Record Found</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;font-size:13px">
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Name</span><br/><strong style="font-size:15px;color:var(--navy)">${_esc(a.name||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Roll No.</span><br/><strong>${_esc(a.rollFull||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Email</span><br/><strong style="word-break:break-all">${_esc(a.email||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Contact</span><br/><strong>${_esc(a.contactNo||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Guardian</span><br/><strong>${_esc(a.guardianName||'—')} (${_esc(a.guardianContact||'—')})</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Date of Birth</span><br/><strong>${_esc(a.dob||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Admission Session</span><br/><strong>${_esc(a.admissionSession||a.semesterNo||'—')}</strong></div>
+          <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Alumni Since</span><br/><strong>${alumniDate}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Hostel / Room</span><br/><strong>${_esc(roomStr)}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Address</span><br/><strong>${_esc(a.address||'—')}${a.district?', '+a.district:''}${a.pin?', PIN '+a.pin:''}</strong></div>
+          <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">No Dues Ref</span><br/><strong>${_esc(a.noDuesRef||'—')}</strong></div>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:14px 0"/>
+        <div style="font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:8px">Documents</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${docLinks}</div>
+      </div>`;
+  } catch(e) {
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Alumni'; }
+    if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown'}</div>`;
+  }
+}
+
+// v30.1: Warden delete student — search + verify first, then delete (master-key secured)
+let _wrDeleteTargetRoll = null;
+let _wrDeleteStudentPhoto = null;
+
+async function _wrDeleteSearchStudent() {
+  const dno  = (document.getElementById('wr-del-roll-no')?.value||'').trim();
+  const dbr  = document.getElementById('wr-del-roll-branch')?.value||'';
+  const dyr  = (document.getElementById('wr-del-roll-year')?.value||'').trim();
+  const rollFull = dno && dbr && dyr ? dno + '/' + dbr + '/' + dyr : '';
+  const previewEl = document.getElementById('wr-del-preview');
+  const confirmEl = document.getElementById('wr-del-confirm-section');
+  const resultEl = document.getElementById('wr-del-result');
+  const searchBtn = document.getElementById('wr-del-search-btn');
+
+  if(!rollFull) {
+    if(previewEl) previewEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter all three roll number fields.</div>';
+    if(confirmEl) confirmEl.classList.add('hidden');
+    _wrDeleteTargetRoll = null;
+    return;
+  }
+
+  if(searchBtn) { searchBtn.disabled = true; searchBtn.innerHTML = '<span class="spinner spinner-dark"></span> Searching…'; }
+  if(resultEl) resultEl.innerHTML = '';
+  _wrDeleteTargetRoll = null;
+  _wrDeleteStudentPhoto = null;
+
+  try {
+    const r = await callBackend('getStudent', { rollFull });
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+
+    if(!r || !r.success || !r.student) {
+      _wrDeleteTargetRoll = null;
+      if(previewEl) previewEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">❌ No student found with roll number <strong>${rollFull}</strong>.</div>`;
+      if(confirmEl) confirmEl.classList.add('hidden');
+      return;
+    }
+
+    _wrDeleteTargetRoll = r.student.rollFull;
+    const s = r.student;
+    const hi = s.hostelInfo || {};
+    const roomStr = hi.hostel ? `${hi.hostel} · Room ${hi.roomNo||'—'} · Bed ${hi.bedNo||'—'}` : 'Not allotted';
+
+    // Render preview card (same style as edit student preview)
+    if(previewEl) previewEl.innerHTML = `
+      <div style="border:1.5px solid var(--danger);border-radius:var(--radius-md);padding:14px;background:#fff5f5">
+        <div style="font-size:11px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚠ Student Found — Verify Before Deleting</div>
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div style="flex-shrink:0">
+            <img id="wr-del-preview-photo" src="" style="width:72px;height:88px;object-fit:cover;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);display:none"/>
+            <div id="wr-del-preview-photo-ph" style="width:72px;height:88px;border:1.5px dashed var(--gray-200);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:11px;text-align:center">No<br>Photo</div>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px">
+            <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Name</span><br/><strong style="color:var(--navy)">${_esc(s.name||'—')}</strong></div>
+            <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Roll No.</span><br/><strong>${_esc(s.rollFull||'—')}</strong></div>
+            <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Status</span><br/><span class="badge badge-${s.status||'pending'}">${s.status||'—'}</span></div>
+            <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Contact</span><br/><strong>${_esc(s.contactNo||'—')}</strong></div>
+            <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Email</span><br/><strong style="word-break:break-all">${_esc(s.email||'—')}</strong></div>
+            <div><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Hostel / Room</span><br/><strong>${_esc(roomStr)}</strong></div>
+            <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Guardian</span><br/><strong>${_esc(s.guardianName||'—')} (${_esc(s.guardianContact||'—')})</strong></div>
+            <div style="grid-column:1/-1"><span style="color:var(--gray-500);font-size:11px;text-transform:uppercase;letter-spacing:.3px">Admission Session</span><br/><strong>${_esc(s.admissionSession||s.semesterNo||'—')}</strong></div>
+          </div>
+        </div>
+      </div>`;
+
+    // Show the master key + delete button
+    if(confirmEl) confirmEl.classList.remove('hidden');
+
+    // Fetch photo in background
+    _wrDeleteStudentPhoto = null;
+    callBackend('getProfileImages', { rollFull: s.rollFull }).then(pr => {
+      if(pr && pr.success && pr.photo) {
+        _wrDeleteStudentPhoto = pr.photo;
+        const photoImg = document.getElementById('wr-del-preview-photo');
+        if(photoImg) {
+          photoImg.src = 'data:image/jpeg;base64,' + pr.photo;
+          photoImg.style.display = 'block';
+          const ph = document.getElementById('wr-del-preview-photo-ph');
+          if(ph) ph.style.display = 'none';
+        }
+      }
+    }).catch(()=>{});
+  } catch(e) {
+    if(searchBtn) { searchBtn.disabled = false; searchBtn.innerHTML = '🔍 Search Student'; }
+    _wrDeleteTargetRoll = null;
+    if(previewEl) previewEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown error'}</div>`;
+    if(confirmEl) confirmEl.classList.add('hidden');
+  }
+}
+
+async function _wrDeleteStudent() {
+  const masterKey = document.getElementById('wr-del-masterkey')?.value || '';
+  const resultEl = document.getElementById('wr-del-result');
+  const btn = document.getElementById('wr-del-btn');
+  const confirmEl = document.getElementById('wr-del-confirm-section');
+
+  if(!_wrDeleteTargetRoll) {
+    if(resultEl) resultEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please search for a student first to verify their identity.</div>';
+    return;
+  }
+  if(!masterKey) {
+    if(resultEl) resultEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter the master key.</div>';
+    return;
+  }
+
+  const rollFull = _wrDeleteTargetRoll;
+  if(!confirm('⚠ PERMANENT DELETION\n\nYou are about to permanently delete student ' + rollFull + '.\n\nThis will remove ALL their data:\n  • Student record\n  • Login account\n  • Photos & signatures\n  • All leave applications\n  • All grievances\n  • All messages\n  • Drive folder (all PDFs)\n\nThis CANNOT be undone.\n\nProceed?')) return;
+  if(!confirm('Are you absolutely sure? This is your FINAL confirmation. The student ' + rollFull + ' will be permanently deleted.')) return;
+
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Deleting...'; }
+  if(resultEl) resultEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Permanently deleting student ' + rollFull + '...</div>';
+
+  try {
+    const r = await callBackend('wardenDeleteStudent', { rollFull, masterKey });
+    if(btn) { btn.disabled = false; btn.innerHTML = '🗑 Delete Student Permanently'; }
+    if(r && r.success) {
+      toast('✅ Student deleted permanently.', 'success');
+      if(resultEl) resultEl.innerHTML = '<div class="alert alert-success" style="font-size:12.5px">✅ ' + r.message + '</div>';
+      // Clear everything
+      document.getElementById('wr-del-roll-no').value = '';
+      document.getElementById('wr-del-roll-year').value = '';
+      document.getElementById('wr-del-masterkey').value = '';
+      _wrDeleteTargetRoll = null;
+      const previewEl = document.getElementById('wr-del-preview');
+      if(previewEl) previewEl.innerHTML = '';
+      if(confirmEl) confirmEl.classList.add('hidden');
+      // Refresh warden data
+      loadWardenData(true);
+    } else {
+      const errMsg = (r && r.error) || 'Failed to delete student.';
+      toast('Failed: ' + errMsg, 'error');
+      if(resultEl) resultEl.innerHTML = '<div class="alert alert-danger" style="font-size:12.5px">⚠ ' + errMsg + '</div>';
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.innerHTML = '🗑 Delete Student Permanently'; }
+    toast('Error: ' + (e.message || 'Unknown'), 'error');
+    if(resultEl) resultEl.innerHTML = '<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ' + (e.message || 'Unknown') + '</div>';
+  }
+}
+
+// v29.0: One-time Fix All Drive Sharing
+async function _wrFixAllDriveSharing() {
+  const masterKey = document.getElementById('wr-fixsharing-masterkey')?.value || '';
+  const resultEl = document.getElementById('wr-fixsharing-result');
+  const btn = document.getElementById('wr-fixsharing-btn');
+  if(!masterKey) {
+    if(resultEl) resultEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter the master key.</div>';
+    return;
+  }
+  if(!confirm('This will fix Drive sharing on ALL existing student PDFs (provisional letters, allotment letters, no dues, HDNs, leave letters).\n\nIt may take a few seconds for large datasets.\n\nProceed?')) return;
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Fixing...'; }
+  if(resultEl) resultEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Scanning all student documents and fixing Drive sharing... This may take a minute.</div>';
+  try {
+    const r = await callBackend('fixAllDriveSharing', { masterKey });
+    if(btn) { btn.disabled = false; btn.innerHTML = '🔧 Fix All Drive Sharing Now'; }
+    if(r && r.success) {
+      toast('✅ Drive sharing fixed for ' + r.fixed + ' file(s)!', 'success');
+      let html = `<div class="alert alert-success" style="font-size:12.5px">
+        ✅ <strong>${r.message}</strong><br/><br/>
+        <small>Files fixed: <strong>${r.fixed}</strong> | Failed: <strong>${r.failed}</strong> | Skipped: ${r.skipped}<br/>
+        Student records updated: ${r.studentsUpdated} | Leave records updated: ${r.leavesUpdated}</small>
+      </div>`;
+      if(r.errors && r.errors.length) {
+        html += '<div style="margin-top:10px;font-size:12px;color:var(--gray-600)">Failed files (may be deleted or inaccessible):</div>';
+        html += '<div style="margin-top:6px;max-height:150px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:8px">';
+        r.errors.slice(0, 30).forEach(e => {
+          html += `<div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--gray-100)">Row ${e.row} · ${e.key} · ${e.error}</div>`;
+        });
+        if(r.errors.length > 30) html += `<div style="font-size:11px;padding:3px 0;color:var(--gray-500)">… and ${r.errors.length - 30} more</div>`;
+        html += '</div>';
+      }
+      if(resultEl) resultEl.innerHTML = html;
+    } else {
+      const errMsg = (r && r.error) || 'Failed to fix Drive sharing.';
+      toast('Failed: ' + errMsg, 'error');
+      if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ ${errMsg}</div>`;
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.innerHTML = '🔧 Fix All Drive Sharing Now'; }
+    toast('Error: ' + (e.message || 'Unknown'), 'error');
+    if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown'}</div>`;
+  }
+}
+
 // ── WARDEN REFRESH ALL ──────────────────────────────────────────────────────
 // Forces a full reload of ALL data from the database (students, leaves,
 // grievances). Clears all caches and re-renders every tab.
@@ -7138,7 +7414,7 @@ function wrTab(name) {
   // Actual HTML button order (verified):
   //   applications, students, fines, leaves, nodues, letters, grievances,
   //   unlock, datesettings, reports, messages, notices, debar
-  const TAB_ORDER = ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','messages','notices','editstudent','debar'];
+  const TAB_ORDER = ['applications','students','fines','leaves','nodues','letters','grievances','unlock','datesettings','reports','messages','notices','editstudent','alumni','debar'];
   TAB_ORDER.forEach(t=>{
     const el = document.getElementById('wr-tab-'+t);
     if(el) el.classList.toggle('hidden', t!==name);
@@ -8310,7 +8586,7 @@ async function doProvisionalApprove(rollFull) {
   if(btn) { btn.disabled=false; btn.innerHTML='📋 Issue Provisional Allotment Letter'; }
 
   if(r.success) {
-    toast(`Provisional Allotment Letter issued! Ref: ${r.refNo}. Payment deadline: ${dueDateDisplay}. Student can download with their Access Key.`, 'success');
+    toast(`Provisional Allotment Letter issued! Ref: ${r.refNo}. Payment deadline: ${dueDateDisplay}. Student can download after registering on the portal.`, 'success');
     const idx = wrStudents.findIndex(x=>x.rollFull===rollFull);
     if(idx>=0) { wrStudents[idx].status='provisional'; }
     wrCloseApprove();
@@ -12248,11 +12524,16 @@ document.addEventListener('keydown', (e) => {
 function dlReset() {
   // Clear form and hide result
   const emailEl = document.getElementById('dl-email');
-  const keyEl   = document.getElementById('dl-access-key');
   if(emailEl) emailEl.value = '';
-  if(keyEl)   keyEl.value   = '';
+  const rollNoEl = document.getElementById('dl-roll-no');
+  const rollYrEl = document.getElementById('dl-roll-year');
+  if(rollNoEl) rollNoEl.value = '';
+  if(rollYrEl) rollYrEl.value = '';
+  const gMobileEl = document.getElementById('dl-guardian-mobile');
+  if(gMobileEl) gMobileEl.value = '';
   clearErr('dl-email');
-  clearErr('dl-access-key');
+  clearErr('dl-roll');
+  clearErr('dl-guardian-mobile');
   clearErr('dl-verify');
   const verify = document.getElementById('dl-step-verify');
   const result = document.getElementById('dl-step-result');
@@ -12261,21 +12542,28 @@ function dlReset() {
 }
 
 async function verifyAndDownload() {
-  clearErr('dl-email'); clearErr('dl-access-key'); clearErr('dl-verify');
+  clearErr('dl-email'); clearErr('dl-roll'); clearErr('dl-guardian-mobile'); clearErr('dl-verify');
 
+  // v30.0: Use roll number + email + guardian mobile (no access key)
+  const dno  = (document.getElementById('dl-roll-no')?.value||'').trim();
+  const dbr  = document.getElementById('dl-roll-branch')?.value||'';
+  const dyr  = (document.getElementById('dl-roll-year')?.value||'').trim();
+  const rollFull = dno && dbr && dyr ? dno + '/' + dbr + '/' + dyr : '';
   const email = (document.getElementById('dl-email')?.value || '').trim().toLowerCase();
-  const key   = (document.getElementById('dl-access-key')?.value || '').trim();
+  const gMobile = (document.getElementById('dl-guardian-mobile')?.value || '').trim();
+
   let ok = true;
+  if(!rollFull) { showErr('dl-roll','Roll number is required (all 3 fields)'); ok=false; }
   if(!email) { showErr('dl-email','Email is required'); ok=false; }
   else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr('dl-email','Enter a valid email address'); ok=false; }
-  if(!key)   { showErr('dl-access-key','Access Key is required'); ok=false; }
+  if(!gMobile) { showErr('dl-guardian-mobile','Guardian mobile number is required'); ok=false; }
   if(!ok) return;
 
   const btn = document.getElementById('dl-verify-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Verifying…';
 
-  const r = await callBackend('getProvisionalLetter', { email: email, accessKey: key });
+  const r = await callBackend('getProvisionalLetterByRoll', { rollFull: rollFull, email: email, guardianMobile: gMobile });
 
   btn.disabled = false;
   btn.innerHTML = '🔍 Verify &amp; Get Letter';
