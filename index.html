@@ -1544,9 +1544,11 @@
         <hr style="border:none;border-top:1px solid var(--gray-100);margin:24px 0 16px"/>
         <div class="section-heading" style="font-size:14px;color:var(--danger)">🔧 Fix All Drive Sharing (One-Time Tool)</div>
         <div class="alert alert-warning" style="font-size:12px;margin:8px 0 12px">
-          This one-time tool fixes the "Drive permission" error for ALL existing student PDFs (provisional letters, allotment letters, no dues certificates, HDNs, and leave approval letters).
-          It sets sharing to "Anyone with link — View" on every PDF file in Drive, and cleans all stored URLs.
-          <strong>Run this once after deploying v29.0.</strong> Requires the master key.
+          This tool does the following for ALL existing student PDFs (provisional letters, allotment letters, no dues, HDNs, leave letters):
+          <strong>1.</strong> Removes "anyone with link" public sharing (fixes Google ToS blocking).<br/>
+          <strong>2.</strong> Shares each PDF with the student's Google account only.<br/>
+          <strong>3.</strong> Cleans all stored URLs.<br/>
+          <strong>Run this once after deploying v33.1.</strong> Requires the master key.
         </div>
         <div class="field">
           <label>Master Key <span class="req">*</span></label>
@@ -1557,6 +1559,14 @@
         </div>
         <button class="btn btn-danger" onclick="_wrFixAllDriveSharing()" id="wr-fixsharing-btn" style="margin-top:6px">🔧 Fix All Drive Sharing Now</button>
         <div id="wr-fixsharing-result" style="margin-top:12px"></div>
+
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:24px 0 16px"/>
+        <div class="section-heading" style="font-size:14px;color:var(--navy)">🔍 Check Sharing Status (Read-Only)</div>
+        <div class="alert alert-info" style="font-size:12px;margin:8px 0 12px">
+          Check whether each student's PDFs are shared with their Google account. This is <strong>read-only</strong> — it does not modify anything. Shows per-student status and per-file details.
+        </div>
+        <button class="btn btn-primary" onclick="_wrCheckSharingStatus()" id="wr-check-sharing-btn" style="margin-top:6px">🔍 Check Sharing Status Now</button>
+        <div id="wr-check-sharing-result" style="margin-top:12px"></div>
 
       </div><!-- end wr-tab-datesettings -->
 
@@ -2861,7 +2871,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v31.0';
+const EXPECTED_BACKEND_VERSION = 'v36.2';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -4493,8 +4503,23 @@ function renderStudentProfile() {
   if(isAlumni) {
     const dl = getDriveLinks(s);
     let docBtns = '';
-    if(dl.allotmentLetter) docBtns += `<a href="${dl.allotmentLetter}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px">📄 Allotment Letter</a>`;
-    if(dl.noDuesCert)      docBtns += `<a href="${dl.noDuesCert}" target="_blank" class="btn btn-gold btn-sm" style="font-size:12px;gap:5px">📄 No Dues Certificate</a>`;
+    // v36.0: Use the doGet PDF proxy URL (GAS_URL?action=pdf&fileId=XXX) so the
+    // alumni can view/download their No Dues Cert and Allotment Letter without
+    // needing to be logged into their Google account in the same browser. The
+    // backend's doGet() handler reads the file with the script's own Drive
+    // permissions (script owner = file owner), so the proxy URL always works
+    // after alumni login — even if their browser is logged out of Google.
+    // v36.1: Fall back to the separate URL columns (s.noDuesCertUrl /
+    // s.allotmentLetterUrl / s.provisionalLetterUrl) if the driveLinks JSON is
+    // missing the corresponding key. _alumniToStudentObj already backfills
+    // these into driveLinks, but we add the fallback here too as
+    // defense-in-depth so the alumni always sees their No Dues Certificate.
+    const alUrl = dl.allotmentLetter   || s.allotmentLetterUrl   || '';
+    const ndUrl = dl.noDuesCert       || s.noDuesCertUrl        || '';
+    const plUrl = dl.provisionalLetter || s.provisionalLetterUrl || '';
+    if(alUrl) docBtns += `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${_gasPdfProxyUrl(alUrl)}')" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px">📄 Allotment Letter</a>`;
+    if(ndUrl) docBtns += `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${_gasPdfProxyUrl(ndUrl)}')" class="btn btn-gold btn-sm" style="font-size:12px;gap:5px">📄 No Dues Certificate</a>`;
+    if(plUrl) docBtns += `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${_gasPdfProxyUrl(plUrl)}')" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px">📋 Provisional Letter</a>`;
     const notice = document.createElement('div');
     notice.id = 'cs-alumni-lock';
     notice.innerHTML = `
@@ -6741,9 +6766,23 @@ async function _wrAlumniSearch() {
     const alumniDate = a.alumniDate ? _fmtDispDDMMYYYY(a.alumniDate) : '—';
     const dl = a.driveLinks || {};
     let docLinks = '';
-    if(dl.provisionalLetter) docLinks += `<a href="${_cleanDriveUrl(dl.provisionalLetter)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px">📋 Provisional Letter</a>`;
-    if(dl.allotmentLetter)   docLinks += `<a href="${_cleanDriveUrl(dl.allotmentLetter)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px">📄 Allotment Letter</a>`;
-    if(dl.noDuesCert)        docLinks += `<a href="${_cleanDriveUrl(dl.noDuesCert)}" target="_blank" class="btn btn-gold btn-sm" style="font-size:11px">📄 No Dues Certificate</a>`;
+    // v36.0: Use the doGet PDF proxy URL (GAS_URL?action=pdf&fileId=XXX) so the
+    // warden can open alumni PDFs (No Dues Cert / Provisional / Allotment Letter)
+    // even if their browser's Google account is NOT the script-owner account.
+    // The backend's doGet() handler reads the file with the script's own Drive
+    // permissions (script owner = file owner), so the URL works for any
+    // authenticated warden session.
+    // v36.1: Fall back to the separate URL columns (noDuesCertUrl /
+    // allotmentLetterUrl / provisionalLetterUrl) if the driveLinks JSON is
+    // missing the corresponding key. The backend's getAlumniRecord already
+    // does this backfill, but we do it here too as defense-in-depth so the
+    // warden always sees the No Dues Certificate button.
+    const ndUrl  = dl.noDuesCert   || a.noDuesCertUrl   || '';
+    const alUrl  = dl.allotmentLetter || a.allotmentLetterUrl || '';
+    const plUrl  = dl.provisionalLetter || a.provisionalLetterUrl || '';
+    if(plUrl) docLinks += `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${_gasPdfProxyUrl(plUrl)}')" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px">📋 Provisional Letter</a>`;
+    if(alUrl) docLinks += `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${_gasPdfProxyUrl(alUrl)}')" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px">📄 Allotment Letter</a>`;
+    if(ndUrl) docLinks += `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${_gasPdfProxyUrl(ndUrl)}')" class="btn btn-gold btn-sm" style="font-size:11px">📄 No Dues Certificate</a>`;
     if(!docLinks) docLinks = '<span style="color:var(--gray-400);font-size:12px">No document links available</span>';
 
     if(resultEl) resultEl.innerHTML = `
@@ -6920,24 +6959,128 @@ async function _wrFixAllDriveSharing() {
     if(resultEl) resultEl.innerHTML = '<div class="alert alert-warning" style="font-size:12.5px">⚠ Please enter the master key.</div>';
     return;
   }
-  if(!confirm('This will fix Drive sharing on ALL existing student PDFs (provisional letters, allotment letters, no dues, HDNs, leave letters).\n\nIt may take a few seconds for large datasets.\n\nProceed?')) return;
+  if(!confirm('This will fix Drive sharing on ALL existing student PDFs (provisional letters, allotment letters, no dues, HDNs, leave letters, AND alumni PDFs).\n\nFiles that are already tagged as shared in the sheet will be SKIPPED (no Drive API call) — this is fast on subsequent runs.\n\nIt may take a few seconds for large datasets.\n\nProceed?')) return;
   if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Fixing...'; }
-  if(resultEl) resultEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Scanning all student documents and fixing Drive sharing... This may take a minute.</div>';
+  if(resultEl) resultEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Scanning sheets (Students / Leaves / Alumni) and sharing untagged files... Files already in the sheet\'s shareTag are skipped (no Drive API call).</div>';
   try {
     const r = await callBackend('fixAllDriveSharing', { masterKey });
     if(btn) { btn.disabled = false; btn.innerHTML = '🔧 Fix All Drive Sharing Now'; }
     if(r && r.success) {
-      toast('✅ Drive sharing fixed for ' + r.fixed + ' file(s)!', 'success');
+      toast('✅ Drive sharing processed for ' + r.fixed + ' file(s)!', 'success');
       let html = `<div class="alert alert-success" style="font-size:12.5px">
-        ✅ <strong>${r.message}</strong><br/><br/>
-        <small>Files fixed: <strong>${r.fixed}</strong> | Failed: <strong>${r.failed}</strong> | Skipped: ${r.skipped}<br/>
-        Student records updated: ${r.studentsUpdated} | Leave records updated: ${r.leavesUpdated}</small>
+        ✅ <strong>${r.message}</strong>
       </div>`;
+
+      // v33.4: Summary stats
+      html += `<div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap">
+        <div style="padding:8px 14px;background:var(--success-bg);border:1px solid var(--success);border-radius:6px;font-size:12px">
+          ✅ Newly Shared: <strong>${r.sharedOk || 0}</strong>
+        </div>
+        <div style="padding:8px 14px;background:#e8f4fd;border:1px solid var(--info);border-radius:6px;font-size:12px">
+          ⏭ Already Shared (skipped, no Drive API): <strong>${r.alreadyShared || 0}</strong>
+        </div>
+        <div style="padding:8px 14px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:6px;font-size:12px">
+          ❌ Share FAILED: <strong>${r.shareFailed || 0}</strong>
+        </div>
+        <div style="padding:8px 14px;background:#fff3e0;border:1px solid var(--warning);border-radius:6px;font-size:12px">
+          🔓 Public removed: <strong>${r.publicRemoved || 0}</strong>
+        </div>
+      </div>`;
+
+      // v36.0: Total counts
+      html += `<div style="margin-top:10px;font-size:11px;color:var(--gray-500)">
+        📊 Students: ${r.studentStatus?.length || 0} &nbsp;·&nbsp; Leaves: ${r.leaveStatus?.length || 0} &nbsp;·&nbsp; Alumni: ${r.alumniStatus?.length || 0}
+      </div>`;
+
+      // Per-student sharing status panel
+      if(r.studentStatus && r.studentStatus.length) {
+        html += '<div style="margin-top:14px;font-size:13px;font-weight:700;color:var(--navy)">📋 Per-Student Sharing Status</div>';
+        html += '<div style="margin-top:8px;max-height:300px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:0">';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        html += '<thead><tr style="background:var(--gray-50);position:sticky;top:0">';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Roll No.</th>';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Name</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">Status</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">New</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">Skipped</th>';
+        html += '</tr></thead><tbody>';
+        r.studentStatus.forEach(s => {
+          const bgColor = s.shared ? '#f0fff0' : '#fff0f0';
+          const statusBadge = s.shared
+            ? '<span style="color:var(--success);font-weight:700">✅ Shared OK</span>'
+            : '<span style="color:var(--danger);font-weight:700">❌ FAILED</span>';
+          html += `<tr style="background:${bgColor}">`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.roll || '—')}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.name || '—')}<br/><span style="font-size:10px;color:var(--gray-500)">${_esc(s.email || '—')}</span></td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center">${statusBadge}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center">${s.newlySharedCount || 0}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center;color:var(--info)">${s.alreadySharedCount || 0}</td>`;
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+
+      // v36.0: Per-leave sharing status panel
+      if(r.leaveStatus && r.leaveStatus.length) {
+        html += '<div style="margin-top:14px;font-size:13px;font-weight:700;color:var(--navy)">📋 Per-Leave Sharing Status</div>';
+        html += '<div style="margin-top:8px;max-height:300px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:0">';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        html += '<thead><tr style="background:var(--gray-50);position:sticky;top:0">';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Leave ID</th>';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Roll No.</th>';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Student Email</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">Status</th>';
+        html += '</tr></thead><tbody>';
+        r.leaveStatus.forEach(s => {
+          const bgColor = s.shared ? '#f0fff0' : '#fff0f0';
+          const statusBadge = s.alreadyShared
+            ? '<span style="color:var(--info);font-weight:700">⏭ Already</span>'
+            : (s.shared ? '<span style="color:var(--success);font-weight:700">✅ Shared</span>'
+                        : '<span style="color:var(--danger);font-weight:700">❌ FAILED</span>');
+          html += `<tr style="background:${bgColor}">`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.leaveId || '—')}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.roll || '—')}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.email || '—')}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center">${statusBadge}</td>`;
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+
+      // v36.0: Per-alumni sharing status panel
+      if(r.alumniStatus && r.alumniStatus.length) {
+        html += '<div style="margin-top:14px;font-size:13px;font-weight:700;color:var(--navy)">🎓 Per-Alumni Sharing Status</div>';
+        html += '<div style="margin-top:8px;max-height:300px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:0">';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        html += '<thead><tr style="background:var(--gray-50);position:sticky;top:0">';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Roll No.</th>';
+        html += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Name</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">Status</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">New</th>';
+        html += '<th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-200)">Skipped</th>';
+        html += '</tr></thead><tbody>';
+        r.alumniStatus.forEach(s => {
+          const bgColor = s.shared ? '#f0fff0' : '#fff0f0';
+          const statusBadge = s.shared
+            ? '<span style="color:var(--success);font-weight:700">✅ Shared OK</span>'
+            : '<span style="color:var(--danger);font-weight:700">❌ FAILED</span>';
+          html += `<tr style="background:${bgColor}">`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.roll || '—')}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.name || '—')}<br/><span style="font-size:10px;color:var(--gray-500)">${_esc(s.email || '—')}</span></td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center">${statusBadge}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center">${s.newlySharedCount || 0}</td>`;
+          html += `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-align:center;color:var(--info)">${s.alreadySharedCount || 0}</td>`;
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+
+      // Error details
       if(r.errors && r.errors.length) {
         html += '<div style="margin-top:10px;font-size:12px;color:var(--gray-600)">Failed files (may be deleted or inaccessible):</div>';
         html += '<div style="margin-top:6px;max-height:150px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:8px">';
         r.errors.slice(0, 30).forEach(e => {
-          html += `<div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--gray-100)">Row ${e.row} · ${e.key} · ${e.error}</div>`;
+          html += `<div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--gray-100)">${_esc(e.roll || '—')} · ${_esc(e.key || '—')} · ${_esc(e.error || '—')}</div>`;
         });
         if(r.errors.length > 30) html += `<div style="font-size:11px;padding:3px 0;color:var(--gray-500)">… and ${r.errors.length - 30} more</div>`;
         html += '</div>';
@@ -6951,6 +7094,66 @@ async function _wrFixAllDriveSharing() {
   } catch(e) {
     if(btn) { btn.disabled = false; btn.innerHTML = '🔧 Fix All Drive Sharing Now'; }
     toast('Error: ' + (e.message || 'Unknown'), 'error');
+    if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown'}</div>`;
+  }
+}
+
+// v33.5: Check sharing status (read-only)
+async function _wrCheckSharingStatus() {
+  const resultEl = document.getElementById('wr-check-sharing-result');
+  const btn = document.getElementById('wr-check-sharing-btn');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Checking...'; }
+  if(resultEl) resultEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:13px"><span class="spinner spinner-dark"></span> Checking sharing status for all students... This is read-only.</div>';
+  try {
+    const r = await callBackend('checkSharingStatus', {});
+    if(btn) { btn.disabled = false; btn.innerHTML = '🔍 Check Sharing Status Now'; }
+    if(r && r.success) {
+      let html = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="padding:8px 14px;background:var(--success-bg);border:1px solid var(--success);border-radius:6px;font-size:12px">
+          ✅ Shared: <strong>${r.sharedOk || 0}</strong>
+        </div>
+        <div style="padding:8px 14px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:6px;font-size:12px">
+          ❌ Not Shared: <strong>${r.notShared || 0}</strong>
+        </div>
+        <div style="padding:8px 14px;background:#f5f5f5;border:1px solid var(--gray-300);border-radius:6px;font-size:12px">
+          ⚠ Inaccessible: <strong>${r.inaccessible || 0}</strong>
+        </div>
+        <div style="padding:8px 14px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;font-size:12px">
+          Total Files: <strong>${r.totalFiles || 0}</strong>
+        </div>
+      </div>`;
+
+      if(r.studentStatus && r.studentStatus.length) {
+        html += '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📋 Per-Student Status (click to expand)</div>';
+        r.studentStatus.forEach((s, idx) => {
+          const studentColor = s.shared ? '#f0fff0' : '#fff0f0';
+          const studentBadge = s.shared
+            ? '<span style="color:var(--success);font-weight:700">✅ All shared</span>'
+            : '<span style="color:var(--danger);font-weight:700">❌ Not shared</span>';
+          html += `<details style="margin-bottom:4px;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden">
+            <summary style="padding:10px 14px;cursor:pointer;background:${studentColor};font-size:13px;font-weight:600;list-style:none">
+              ${studentBadge} &nbsp; ${_esc(s.roll)} — ${_esc(s.name)} &nbsp; <span style="font-size:11px;color:var(--gray-500)">${_esc(s.email)}</span>
+            </summary>
+            <div style="padding:10px 14px;background:#fff">`;
+          (s.files || []).forEach(f => {
+            const fIcon = f.shared ? '✅' : '❌';
+            const fNote = f.isPublic ? ' <span style="font-size:10px;color:var(--warning)">(public)</span>' : '';
+            html += `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--gray-100)">
+              ${fIcon} <strong>${_esc(f.key)}</strong> — ${_esc(f.fileName)}${fNote}
+            </div>`;
+          });
+          html += '</div></details>';
+        });
+      } else {
+        html += '<div class="alert alert-info" style="font-size:12.5px">No student files found.</div>';
+      }
+
+      if(resultEl) resultEl.innerHTML = html;
+    } else {
+      if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ ${(r && r.error) || 'Failed to check status.'}</div>`;
+    }
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.innerHTML = '🔍 Check Sharing Status Now'; }
     if(resultEl) resultEl.innerHTML = `<div class="alert alert-danger" style="font-size:12.5px">⚠ Error: ${e.message || 'Unknown'}</div>`;
   }
 }
@@ -9867,17 +10070,127 @@ function openRulesPDF() {
 // ─── STUDENT DOCUMENT LINKS ──────────────────────────────────────────────────
 // Safely parse driveLinks regardless of whether it's already an object or a JSON string
 // v28.0: Clean Drive URLs — strip ?usp=drivesdk and normalise to /file/d/ID/view
-function _cleanDriveUrl(url) {
+// v33.3: PDFs are shared with each student's Google account directly (via addViewer).
+// Since all student emails are Google accounts, the student can access the Drive URL
+// directly when logged into their Google account. This avoids ToS scanning and
+// doesn't hit Apps Script quotas.
+// The doGet proxy (?action=pdf&fileId=XXX) is kept as a fallback in the backend.
+function _pdfProxyUrl(url) {
   if(!url || typeof url !== 'string') return url;
   url = url.trim();
-  if(!url.includes('drive.google.com')) return url;
+  // If already a proxy URL, keep as-is
+  if(url.includes('action=pdf&fileId=')) return url;
+  // Extract file ID from any Drive URL format
   let fileId = '';
   const m1 = url.match(/\/file\/d\/([-\w]+)/);
   if(m1) fileId = m1[1];
   if(!fileId) { const m2 = url.match(/[?&]id=([-\w]+)/); if(m2) fileId = m2[1]; }
   if(!fileId) { const m3 = url.match(/open\?id=([-\w]+)/); if(m3) fileId = m3[1]; }
+  if(!fileId) { const m4 = url.match(/\/d\/([-\w]+)/); if(m4) fileId = m4[1]; }
+  // Return direct Drive URL — student is logged into Google, file shared with their account
   if(fileId) return 'https://drive.google.com/file/d/' + fileId + '/view';
   return url.split('?')[0];
+}
+
+// Keep _cleanDriveUrl for backward compat — delegates to _pdfProxyUrl
+function _cleanDriveUrl(url) {
+  return _pdfProxyUrl(url);
+}
+
+// v36.0: Build a doGet PDF-proxy URL for a Drive file.
+//   <GAS_URL>?action=pdf&fileId=FILE_ID
+// The backend's doGet() handler reads the file with the SCRIPT'S own Drive
+// permissions (script owner = file owner = warden), so the URL works for the
+// warden EVEN IF the warden's browser Google account is different from the
+// script owner. Used for:
+//   • Warden's "Alumni" tab → No Dues / Provisional / Allotment letter links
+//     (so the warden can view alumni PDFs without being logged into the file-
+//      owning Google account)
+//   • Alumni's own login → No Dues / Provisional / Allotment letter links
+//     (so alumni can view their PDFs without needing to be logged into their
+//      Google account in the same browser)
+// The fileId in the URL is unguessable, and the alumni/warden already has to
+// authenticate (login or master key) to see the URL in the first place.
+function _gasPdfProxyUrl(url) {
+  if(!url || typeof url !== 'string') return url;
+  url = url.trim();
+  if(url.includes('action=pdf&fileId=')) return url;
+  let fileId = '';
+  const m1 = url.match(/\/file\/d\/([-\w]+)/);
+  if(m1) fileId = m1[1];
+  if(!fileId) { const m2 = url.match(/[?&]id=([-\w]+)/); if(m2) fileId = m2[1]; }
+  if(!fileId) { const m3 = url.match(/open\?id=([-\w]+)/); if(m3) fileId = m3[1]; }
+  if(!fileId) { const m4 = url.match(/\/d\/([-\w]+)/); if(m4) fileId = m4[1]; }
+  if(!fileId) return url.split('?')[0];
+  // GAS_URL is the deployed Apps Script web-app URL (defined at top of file).
+  const sep = GAS_URL.includes('?') ? '&' : '?';
+  return GAS_URL + sep + 'action=pdf&fileId=' + fileId;
+}
+
+// v36.2: Open a PDF via the doGet proxy. The proxy returns JSON with
+// base64-encoded PDF bytes (because Apps Script's ContentService can't serve
+// binary data reliably — it always outputs UTF-8, which corrupts bytes
+// 0x80-0xFF). This function fetches the proxy URL, decodes the base64,
+// creates a Blob, creates an object URL, and opens the PDF in a new tab
+// (the browser's native PDF viewer renders it).
+//
+// Replaces the broken `<a href="proxyUrl" target="_blank">` pattern that
+// failed with: "Cannot read properties of undefined (reading 'ATTACHMENT')"
+// because `setContentDisposition` is not a method on Apps Script's
+// ContentService.TextOutput.
+//
+// Usage: replace `<a href="${proxyUrl}" target="_blank">` with
+//   `<a href="javascript:void(0)" onclick="_openPdfFromDrive('${proxyUrl}')">`.
+function _openPdfFromDrive(proxyUrl) {
+  // Open a blank new tab immediately so the browser doesn't block the popup
+  // (some browsers block window.open() if it's not triggered synchronously
+  // by a user click — we open the blank tab NOW and redirect it later).
+  const popup = window.open('', '_blank');
+  if(!popup) {
+    // Popup blocked — show an alert with a direct link the user can click
+    alert('Popup blocked. Please allow popups for this site to open PDFs, or click OK to open the URL directly in this tab.');
+    return;
+  }
+  popup.document.write('<html><head><title>Loading PDF...</title>' +
+    '<style>body{font-family:system-ui,sans-serif;text-align:center;padding:40px;color:#666;background:#fafafa}' +
+    '.spinner{display:inline-block;width:28px;height:28px;border:3px solid #e0e0e0;border-top-color:#1e3a5f;border-radius:50%;animation:spin 1s linear infinite}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}</style></head><body>' +
+    '<div class="spinner"></div><div style="margin-top:14px;font-size:14px">Loading your document...</div>' +
+    '</body></html>');
+
+  fetch(proxyUrl)
+    .then(res => res.json())
+    .then(json => {
+      if(!json || !json.success) {
+        const errMsg = (json && json.error) || 'Unknown error';
+        popup.document.body.innerHTML = '<div style="font-family:system-ui,sans-serif;text-align:center;padding:40px;color:#c0392b;background:#fafafa">' +
+          '<div style="font-size:48px;margin-bottom:14px">⚠</div>' +
+          '<div style="font-size:16px;font-weight:600;margin-bottom:8px">PDF Not Accessible</div>' +
+          '<div style="font-size:13px;color:#666">' + errMsg + '</div>' +
+          '</div>';
+        return;
+      }
+      // Decode base64 → bytes
+      const byteChars = atob(json.pdfBase64);
+      const len = byteChars.length;
+      const bytes = new Uint8Array(len);
+      for(let i = 0; i < len; i++) bytes[i] = byteChars.charCodeAt(i);
+      // Create Blob with PDF MIME type
+      const mimeType = json.mimeType || 'application/pdf';
+      const blob = new Blob([bytes], {type: mimeType});
+      const blobUrl = URL.createObjectURL(blob);
+      // Redirect the popup tab to the blob URL — the browser shows the PDF
+      popup.location.href = blobUrl;
+      // Revoke the object URL after 5 minutes (lets the user view/download)
+      setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch(_) {} }, 300000);
+    })
+    .catch(err => {
+      popup.document.body.innerHTML = '<div style="font-family:system-ui,sans-serif;text-align:center;padding:40px;color:#c0392b;background:#fafafa">' +
+        '<div style="font-size:48px;margin-bottom:14px">⚠</div>' +
+        '<div style="font-size:16px;font-weight:600;margin-bottom:8px">Failed to Load PDF</div>' +
+        '<div style="font-size:13px;color:#666">' + (err.message || 'Network error') + '</div>' +
+        '</div>';
+    });
 }
 
 function getDriveLinks(s) {
