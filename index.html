@@ -2871,7 +2871,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v36.2';
+const EXPECTED_BACKEND_VERSION = 'v36.3';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -6092,9 +6092,9 @@ function _wrEditRenderForm(s) {
 
       <div class="form-row">
         <div class="field">
-          <label>Access Key</label>
-          <input type="text" id="wr-edit-access-key" value="${_esc(s.accessKey||'')}"/>
-          <div class="hint">Used by student to download provisional letter</div>
+          <label>Share Tag</label>
+          <input type="text" id="wr-edit-access-key" value="${_esc(s.accessKey||'')}" style="font-family:monospace;font-size:11px"/>
+          <div class="hint">v36.0: Repurposed as <strong>Share Tag</strong> — tracks which Drive file IDs have been shared with the student's email. JSON format: <code>{"shared":true,"fileIds":{"FILE_ID":"email"}}</code>. Delete this field's content to force re-sharing via "Fix All Drive Sharing".</div>
         </div>
         <div class="field">
           <label>Renewal Semester (if any)</label>
@@ -14953,7 +14953,11 @@ async function loadAlumniReport() {
   btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Loading…';
   if(st) st.textContent = '';
 
-  const r = await callBackend('getAllStudents');
+  // v36.3: BUG FIX — was calling getAllStudents and filtering by status==='alumni',
+  // but alumni are removed from the Students sheet (archived in Alumni sheet) since
+  // v31.0. So the filter always returned 0 records. Now calls the new getAllAlumni
+  // backend function which reads the Alumni sheet directly.
+  const r = await callBackend('getAllAlumni');
   btn.disabled = false; btn.innerHTML = '🔄 Load / Refresh Report';
 
   if(!r.success) {
@@ -14961,7 +14965,7 @@ async function loadAlumniReport() {
     return;
   }
 
-  _rpt5Data = (r.students||[]).filter(s => s.status === 'alumni');
+  _rpt5Data = r.students || [];
 
   renderAlumniReport();
   if(st) st.innerHTML = `<span style="color:var(--success)">✅ Loaded ${_rpt5Data.length} alumni record(s)</span>`;
