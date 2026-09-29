@@ -1662,6 +1662,45 @@
               <button class="btn btn-primary btn-sm" onclick="loadOccupancyReport()" id="btn-load-rpt1">🔄 Load / Refresh Report</button>
               <span id="rpt1-load-status" style="font-size:12px;margin-left:10px"></span>
             </div>
+
+            <!-- v36.5: ROOM VACANCY PANEL — rooms with < 3 students (clickable to expand) -->
+            <div id="rpt1-vacancy-panel" style="margin-top:18px;display:none">
+              <div style="background:#fff;border:1.5px solid var(--warning);border-radius:var(--radius-md);overflow:hidden">
+                <div style="background:linear-gradient(135deg,#b8860b,#d4a017);padding:10px 16px;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleVacancyPanel()">
+                  <span style="font-size:18px">🛏️</span>
+                  <div style="flex:1">
+                    <div style="font-size:13px;font-weight:700;color:#fff">Room Vacancy Panel — Rooms with less than 3 students</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,.8)">Click a room card to see the students in that room · helps identify vacant/partially-occupied rooms</div>
+                  </div>
+                  <span id="rpt1-vacancy-count" style="background:rgba(255,255,255,.25);color:#fff;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700">0 rooms</span>
+                  <span id="rpt1-vacancy-toggle" style="color:#fff;font-size:16px;margin-left:6px">▾</span>
+                </div>
+                <div id="rpt1-vacancy-body" style="padding:12px 16px;background:#fffbeb">
+                  <!-- Filter row -->
+                  <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+                    <label style="font-size:12px;color:var(--gray-600)">Filter:</label>
+                    <input type="text" id="rpt1-vacancy-filter-hostel" placeholder="Hostel block…" oninput="renderRoomVacancyPanel()" style="font-size:12px;padding:4px 10px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);width:140px"/>
+                    <select id="rpt1-vacancy-filter-mode" onchange="renderRoomVacancyPanel()" style="font-size:12px;padding:4px 10px;border:1px solid var(--gray-200);border-radius:var(--radius-sm)">
+                      <option value="lt3">All rooms with &lt; 3 students</option>
+                      <option value="empty">Empty rooms (0 students)</option>
+                      <option value="partial">Partially occupied (1–2 students)</option>
+                      <option value="all">All rooms (full + partial)</option>
+                    </select>
+                    <input type="text" id="rpt1-vacancy-filter-roll" placeholder="Search roll/name…" oninput="renderRoomVacancyPanel()" style="font-size:12px;padding:4px 10px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);width:160px"/>
+                    <label style="font-size:12px;color:var(--gray-600);display:flex;align-items:center;gap:4px">
+                      <input type="checkbox" id="rpt1-vacancy-include-provisional" checked onchange="renderRoomVacancyPanel()"/>
+                      Include provisional students
+                    </label>
+                    <span id="rpt1-vacancy-summary" style="font-size:11px;color:var(--gray-500);margin-left:auto"></span>
+                  </div>
+                  <!-- Room cards container -->
+                  <div id="rpt1-vacancy-cards" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+                  <!-- Expanded student list (shown when a room card is clicked) -->
+                  <div id="rpt1-vacancy-detail" style="margin-top:14px;display:none"></div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -2871,7 +2910,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v36.4';
+const EXPECTED_BACKEND_VERSION = 'v36.6';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -14276,11 +14315,18 @@ function _rptFmt(n) {
 function _rptDate(s) {
   if(!s || s === '—') return '—';
   try {
-    // Strip time component if present (ISO timestamp like 2025-04-01T10:30:00.000Z)
-    const dateOnly = String(s).split('T')[0];
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return s;
-    const [y,m,d] = dateOnly.split('-').map(Number);
-    return _fmtDispDDMMYYYY(y, m-1, d);
+    // v36.6: BUG FIX — was calling _fmtDispDDMMYYYY(y, m-1, d) with 3 separate
+    // numeric args, but _fmtDispDDMMYYYY only accepts ONE argument (Date or
+    // string). When called with 3 args, only the first (y, a number) was
+    // used as `input` — so _fmtDispDDMMYYYY received "2026" (a number string),
+    // failed to parse it as DD/MM/YYYY or YYYY-MM-DD, fell back to
+    // new Date("2026") which is invalid, and returned "2026" — that's why
+    // the Date of Payment column showed just the year.
+    //
+    // FIX: Pass the original string (or Date) directly to _fmtDispDDMMYYYY.
+    // It already handles ISO timestamps, YYYY-MM-DD, DD/MM/YYYY, and Date
+    // objects — no need to pre-parse here.
+    return _fmtDispDDMMYYYY(s);
   } catch { return s; }
 }
 function _rptInstituteName() {
@@ -14304,15 +14350,288 @@ async function loadOccupancyReport() {
 
   if(!r.success) { if(st) st.innerHTML='<span style="color:var(--danger)">Failed: '+(r.error||'')+'</span>'; return; }
 
+  const allStudents = r.students || [];
+
+  // v36.5: Store ALL students with hostelInfo for the Room Vacancy Panel.
+  // This includes provisional students too (so the warden can see rooms that
+  // are partially occupied by provisional students awaiting fee payment).
+  // The panel will let the warden toggle whether to include provisional students.
+  _rpt1AllStudentsWithRooms = allStudents.filter(s =>
+    s.hostelInfo && s.hostelInfo.roomNo && s.hostelInfo.hostel
+  );
+
   // Include both 'approved' AND 'pending' students who have hostelInfo — pending means
   // a new semester was activated and their fee is awaiting verification. They are still
   // current residents and must appear in the occupancy report.
-  _rpt1Data = (r.students||[]).filter(s =>
+  _rpt1Data = allStudents.filter(s =>
     (s.status === 'approved' || s.status === 'pending') && s.hostelInfo && s.hostelInfo.roomNo
   );
   renderOccupancyTable();
+
+  // v36.5: Show + render the Room Vacancy Panel
+  const vacancyPanel = document.getElementById('rpt1-vacancy-panel');
+  if(vacancyPanel) {
+    vacancyPanel.style.display = 'block';
+    renderRoomVacancyPanel();
+  }
+
   if(st) st.innerHTML=`<span style="color:var(--success)">✅ Loaded ${_rpt1Data.length} records</span>`;
 }
+
+// v36.5: All students with hostelInfo (including provisional) — used by Room Vacancy Panel.
+// Alumni are NOT in getAllStudents (they're in the Alumni sheet), so vacated rooms will
+// naturally appear with fewer students — making it easy for the warden to spot rooms
+// that have been vacated and can be re-allotted.
+let _rpt1AllStudentsWithRooms = [];
+let _rpt1VacancyExpandedRoom = null; // which room card is currently expanded
+
+// v36.5: Toggle the Room Vacancy Panel body visibility
+function toggleVacancyPanel() {
+  const body = document.getElementById('rpt1-vacancy-body');
+  const toggle = document.getElementById('rpt1-vacancy-toggle');
+  if(!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
+  if(toggle) toggle.textContent = isHidden ? '▾' : '▸';
+}
+
+// v36.5: Render the Room Vacancy Panel — shows clickable cards for rooms with < 3 students.
+// v36.6: Added "All rooms" mode (shows rooms with 1, 2, AND 3 students) and a roll/name
+// search box so the warden can quickly find any student in any room.
+// Clicking a card expands a detail view listing the students in that room.
+function renderRoomVacancyPanel() {
+  const cardsEl = document.getElementById('rpt1-vacancy-cards');
+  const countEl = document.getElementById('rpt1-vacancy-count');
+  const summaryEl = document.getElementById('rpt1-vacancy-summary');
+  const detailEl = document.getElementById('rpt1-vacancy-detail');
+  if(!cardsEl) return;
+
+  const hostelFilter = (document.getElementById('rpt1-vacancy-filter-hostel')?.value || '').toLowerCase().trim();
+  const modeFilter  = document.getElementById('rpt1-vacancy-filter-mode')?.value || 'lt3';
+  const rollFilter  = (document.getElementById('rpt1-vacancy-filter-roll')?.value || '').toLowerCase().trim();
+  const includeProv = document.getElementById('rpt1-vacancy-include-provisional')?.checked !== false;
+
+  // Build the room → students map from ALL students with hostelInfo
+  const roomMap = {}; // key: "hostel|roomNo" → { hostel, roomNo, students: [] }
+  for(const s of _rpt1AllStudentsWithRooms) {
+    const hi = s.hostelInfo || {};
+    if(!hi.hostel || !hi.roomNo) continue;
+    // Filter by status
+    const status = s.status || 'pending';
+    if(status === 'approved' || status === 'pending') {
+      // always include
+    } else if(status === 'provisional') {
+      if(!includeProv) continue;
+    } else {
+      // skip alumni, rejected, debarred etc.
+      continue;
+    }
+    // Filter by hostel block
+    if(hostelFilter && !String(hi.hostel).toLowerCase().includes(hostelFilter)) continue;
+
+    const key = hi.hostel + '|' + hi.roomNo;
+    if(!roomMap[key]) roomMap[key] = { hostel: hi.hostel, roomNo: hi.roomNo, students: [] };
+    roomMap[key].students.push(s);
+  }
+
+  // Build array of rooms, apply mode filter
+  let rooms = Object.values(roomMap).map(r => ({
+    hostel: r.hostel,
+    roomNo: r.roomNo,
+    students: r.students,
+    count: r.students.length
+  }));
+
+  // v36.6: Apply roll/name search if specified — only show rooms that have a
+  // student whose roll or name matches the search query.
+  if(rollFilter) {
+    rooms = rooms.filter(r => r.students.some(s =>
+      String(s.rollFull||'').toLowerCase().includes(rollFilter) ||
+      String(s.name||'').toLowerCase().includes(rollFilter)
+    ));
+  }
+
+  // Also detect rooms that are completely empty (0 students).
+  // We can't enumerate ALL possible rooms (no master room list), so empty rooms
+  // are NOT shown unless the warden enters a specific hostel+room search.
+  // Instead, we show rooms that have at least 1 student but fewer than 3.
+  // The "empty rooms (0 students)" filter will show a message explaining this.
+
+  let filteredRooms;
+  if(modeFilter === 'empty') {
+    // We can only show empty rooms if we have a master room list. Since we don't,
+    // show a helpful message instead.
+    filteredRooms = [];
+    cardsEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:12px;width:100%">' +
+      'ℹ️ Cannot list completely empty rooms because there is no master room list in the system. ' +
+      'Use <strong>"All rooms with &lt; 3 students"</strong> or <strong>"Partially occupied"</strong> to see rooms with 1–2 students. ' +
+      'Rooms vacated by alumni will appear here once a new student is allotted (provisional/approved/pending).</div>';
+    if(countEl) countEl.textContent = '0 rooms';
+    if(summaryEl) summaryEl.textContent = '';
+    if(detailEl) { detailEl.style.display = 'none'; detailEl.innerHTML = ''; }
+    return;
+  } else if(modeFilter === 'partial') {
+    filteredRooms = rooms.filter(r => r.count >= 1 && r.count < 3);
+  } else if(modeFilter === 'all') {
+    // v36.6: Show ALL rooms with at least 1 student (1, 2, or 3) — useful for
+    // finding a specific student by roll/name when you don't know which room
+    // they're in, or for verifying full rooms.
+    filteredRooms = rooms.filter(r => r.count >= 1);
+  } else {
+    // lt3 — all rooms with < 3 students (which means 1 or 2 since 0 isn't enumerable)
+    filteredRooms = rooms.filter(r => r.count < 3);
+  }
+
+  // Sort: by hostel, then room number (natural sort)
+  filteredRooms.sort((a, b) => {
+    if(a.hostel !== b.hostel) return a.hostel.localeCompare(b.hostel);
+    // Natural sort on room number
+    const na = parseInt(a.roomNo) || 0;
+    const nb = parseInt(b.roomNo) || 0;
+    if(na !== nb) return na - nb;
+    return String(a.roomNo).localeCompare(String(b.roomNo));
+  });
+
+  // Render count + summary
+  if(countEl) countEl.textContent = filteredRooms.length + ' room' + (filteredRooms.length !== 1 ? 's' : '');
+  if(summaryEl) {
+    const totalCap = filteredRooms.length * 3;
+    const totalOcc = filteredRooms.reduce((s, r) => s + r.count, 0);
+    const totalVac = totalCap - totalOcc;
+    if(modeFilter === 'all') {
+      // v36.6: For "all" mode, the summary shows occupied/vacant across ALL shown rooms
+      summaryEl.textContent = `${totalOcc} students in ${filteredRooms.length} rooms · ${totalVac} vacant seat${totalVac !== 1 ? 's' : ''}`;
+    } else {
+      summaryEl.textContent = `${totalOcc} occupied · ${totalVac} vacant (capacity ${totalCap})`;
+    }
+  }
+
+  // Render room cards
+  if(!filteredRooms.length) {
+    cardsEl.innerHTML = '<div style="padding:14px;color:var(--gray-500);font-size:12px;width:100%">' +
+      '✅ All rooms have 3 students (full occupancy). No vacancies to show.</div>';
+    if(detailEl) { detailEl.style.display = 'none'; detailEl.innerHTML = ''; }
+    return;
+  }
+
+  let html = '';
+  for(const r of filteredRooms) {
+    const isExpanded = _rpt1VacancyExpandedRoom === (r.hostel + '|' + r.roomNo);
+    // Color code: 0=red(empty), 1=orange, 2=yellow, 3+=green
+    let bg, border, badge;
+    if(r.count === 0)        { bg = '#fff5f5'; border = '#dc3545'; badge = '#dc3545'; }
+    else if(r.count === 1)   { bg = '#fff8e1'; border = '#ff9800'; badge = '#ff9800'; }
+    else if(r.count === 2)   { bg = '#fffde7'; border = '#fbc02d'; badge = '#fbc02d'; }
+    else                     { bg = '#e8f5e9'; border = '#4caf50'; badge = '#4caf50'; }
+
+    html += `<div onclick="toggleVacancyRoom('${_esc(r.hostel)}','${_esc(r.roomNo)}')" ` +
+      `style="background:${bg};border:2px solid ${border};border-radius:8px;padding:10px 14px;cursor:pointer;min-width:170px;transition:transform .15s" ` +
+      `onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'" ` +
+      `title="Click to see students in this room">` +
+      `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">` +
+      `<div>` +
+      `<div style="font-size:11px;color:var(--gray-600);font-weight:600">${_esc(r.hostel)}</div>` +
+      `<div style="font-size:14px;font-weight:700;color:var(--navy)">Room ${_esc(r.roomNo)}</div>` +
+      `</div>` +
+      `<div style="background:${badge};color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:700;min-width:38px;text-align:center">${r.count}/3</div>` +
+      `</div>` +
+      `<div style="font-size:10px;color:var(--gray-500);margin-top:4px">${3 - r.count} vacant seat${(3 - r.count) !== 1 ? 's' : ''} ${isExpanded ? '▾' : '▸'}</div>` +
+      `</div>`;
+  }
+  cardsEl.innerHTML = html;
+
+  // If a room is expanded, render its detail
+  if(_rpt1VacancyExpandedRoom) {
+    const [h, rn] = _rpt1VacancyExpandedRoom.split('|');
+    renderVacancyRoomDetail(h, rn);
+  } else {
+    if(detailEl) { detailEl.style.display = 'none'; detailEl.innerHTML = ''; }
+  }
+}
+
+// v36.5: Toggle expansion of a room card — show/hide the student list for that room
+function toggleVacancyRoom(hostel, roomNo) {
+  const key = hostel + '|' + roomNo;
+  if(_rpt1VacancyExpandedRoom === key) {
+    _rpt1VacancyExpandedRoom = null; // collapse if same room clicked
+  } else {
+    _rpt1VacancyExpandedRoom = key; // expand this room
+  }
+  renderRoomVacancyPanel();
+}
+
+// v36.5: Render the expanded detail view for a specific room
+function renderVacancyRoomDetail(hostel, roomNo) {
+  const detailEl = document.getElementById('rpt1-vacancy-detail');
+  if(!detailEl) return;
+
+  const key = hostel + '|' + roomNo;
+  const room = _rpt1AllStudentsWithRooms.filter(s => {
+    const hi = s.hostelInfo || {};
+    return hi.hostel === hostel && String(hi.roomNo) === String(roomNo);
+  });
+
+  if(!room.length) {
+    detailEl.style.display = 'block';
+    detailEl.innerHTML = '<div style="padding:14px;background:#fff5f5;border:1px solid var(--danger);border-radius:8px;font-size:12px;color:var(--danger)">' +
+      '⚠ No students found in this room. The room may have been vacated by alumni and not yet re-allotted.</div>';
+    return;
+  }
+
+  let html = '<div style="background:#fff;border:1.5px solid var(--navy);border-radius:8px;overflow:hidden">' +
+    '<div style="background:var(--navy);color:#fff;padding:8px 14px;font-size:13px;font-weight:700">' +
+    '🛏️ ' + _esc(hostel) + ' · Room ' + _esc(roomNo) + ' — ' + room.length + ' student' + (room.length !== 1 ? 's' : '') + ' (capacity 3, ' + (3 - room.length) + ' vacant)</div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gray-50)">' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">#</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Roll No.</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Name</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Status</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Bed</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Chair</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Table</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Contact</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-200)">Email</th>' +
+    '</tr></thead><tbody>';
+
+  room.forEach((s, idx) => {
+    const hi = s.hostelInfo || {};
+    const statusBadge = s.status === 'approved' ? '<span style="color:var(--success);font-weight:700">Approved</span>'
+      : s.status === 'pending' ? '<span style="color:var(--warning);font-weight:700">Pending</span>'
+      : s.status === 'provisional' ? '<span style="color:#ff9800;font-weight:700">Provisional</span>'
+      : '<span>' + _esc(s.status || '—') + '</span>';
+    html += `<tr style="background:${idx % 2 === 0 ? '#fff' : '#fafbfc'}">` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${idx + 1}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);font-weight:600">${_esc(s.rollFull || '—')}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.name || '—')}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${statusBadge}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(hi.bedNo || '—')}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(hi.chairNo || '—')}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(hi.tableNo || '—')}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100)">${_esc(s.contactNo || '—')}</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);word-break:break-all">${_esc(s.email || '—')}</td>` +
+      `</tr>`;
+  });
+
+  // Show vacant seat rows
+  for(let i = room.length; i < 3; i++) {
+    html += `<tr style="background:#fffbeb">` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--warning)">—</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400);font-style:italic">VACANT</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400);font-style:italic">—</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--warning);font-style:italic">Available</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400)">—</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400)">—</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400)">—</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400)">—</td>` +
+      `<td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);color:var(--gray-400)">—</td>` +
+      `</tr>`;
+  }
+
+  html += '</tbody></table></div>';
+  detailEl.style.display = 'block';
+  detailEl.innerHTML = html;
+}
+
 
 function _buildOccupancyRows(students) {
   return students.map(s => {
