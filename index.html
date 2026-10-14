@@ -672,36 +672,52 @@
         <button class="btn btn-primary btn-full" onclick="doRegister()" id="btn-register">Create Account</button>
       </div>
 
-      <!-- Forgot Password Form -->
+      <!-- v36.7: Forgot Password — verify identity via email + roll + DOB + parent's contact -->
       <div id="auth-forgot" class="hidden">
         <div class="card-title" style="font-size:16px;margin-bottom:4px">Forgot Password</div>
-        <div class="card-subtitle">Enter your email to get a reset code</div>
+        <div class="card-subtitle">Verify your identity to set a new password</div>
+        <div class="alert alert-info" style="font-size:12px;margin:10px 0">
+          🔒 Enter your <strong>Email ID</strong>, <strong>Roll No.</strong>, <strong>Date of Birth</strong>, and <strong>Parent's Contact No.</strong>. If all four match our records, you can set a new password immediately — no email ref code needed.
+        </div>
         <div id="forgot-step1">
           <div class="field">
             <label>Email ID <span class="req">*</span></label>
             <input type="email" id="forgot-email" placeholder="your@email.com"/>
           </div>
+          <div class="field">
+            <label>Roll No. <span class="req">*</span></label>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="forgot-roll-no" placeholder="No." style="flex:1"/>
+              <select id="forgot-roll-branch" style="flex:1.2"></select>
+              <input type="text" id="forgot-roll-year" placeholder="Year" style="flex:1"/>
+            </div>
+          </div>
+          <div class="field">
+            <label>Date of Birth <span class="req">*</span></label>
+            <input type="text" id="forgot-dob" placeholder="DD/MM/YYYY"/>
+          </div>
+          <div class="field">
+            <label>Parent's Contact No. <span class="req">*</span></label>
+            <input type="text" id="forgot-guardian-contact" placeholder="e.g. 9876543210"/>
+          </div>
           <div class="err-msg hidden" id="err-forgot" style="margin-bottom:10px"></div>
-          <button class="btn btn-primary btn-full" onclick="doForgot()" id="btn-forgot">Get Reset Code</button>
+          <button class="btn btn-primary btn-full" onclick="doForgot()" id="btn-forgot">Verify &amp; Continue</button>
         </div>
         <div id="forgot-step2" class="hidden">
           <div class="alert alert-success" style="margin-bottom:14px;font-size:13px">
-            ✅ A password reset code has been sent to your email address. Please check your inbox.
+            ✅ <strong>Identity verified.</strong> Please set a new password below.
           </div>
-          <div class="field">
-            <label>Reset Code <span class="req">*</span></label>
-            <input type="text" id="reset-token" placeholder="8-character code" style="text-transform:uppercase;letter-spacing:3px;font-weight:700;font-size:16px"/>
-          </div>
+          <input type="hidden" id="reset-token"/>
           <div class="field">
             <label>New Password <span class="req">*</span></label>
-            <input type="password" id="reset-pwd" placeholder="New password"/>
+            <input type="password" id="reset-pwd" placeholder="New password (min 4 chars)"/>
           </div>
           <div class="field">
             <label>Confirm New Password <span class="req">*</span></label>
             <input type="password" id="reset-cpwd" placeholder="Re-enter new password"/>
           </div>
           <div class="err-msg hidden" id="err-reset" style="margin-bottom:10px"></div>
-          <button class="btn btn-primary btn-full" onclick="doReset()">Reset Password</button>
+          <button class="btn btn-primary btn-full" onclick="doReset()">Set New Password</button>
         </div>
       </div>
 
@@ -2910,7 +2926,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzLw9ymx7aiX9EoEzh9YpWQ
 // ─── BACKEND VERSION CHECK ──────────────────────────────────────────────────
 // Fetches the backend version on page load and displays a small status banner
 // on the Download Provisional Letter page. Helps verify the deployment is current.
-const EXPECTED_BACKEND_VERSION = 'v36.6';
+const EXPECTED_BACKEND_VERSION = 'v36.7';
 let _backendVersion = null;
 let _backendVersionChecked = false;
 
@@ -2995,6 +3011,19 @@ document.addEventListener('DOMContentLoaded', () => {
   updateRollPreview();
   // Auto-format text inputs to standard case
   applyInputFormatting();
+
+  // v36.7: Populate the Forgot Password form's branch dropdown with the same
+  // branch options used by the registration form (CE, CSE, EE, EC, FTS, ME).
+  // Default selection: CSE.
+  const forgotBranchSel = document.getElementById('forgot-roll-branch');
+  if(forgotBranchSel) {
+    ['CE','CSE','EE','EC','FTS','ME'].forEach((b, idx) => {
+      const o = document.createElement('option');
+      o.value = b; o.textContent = b;
+      if(idx === 1) o.selected = true;
+      forgotBranchSel.add(o);
+    });
+  }
 
   // If the page is opened with a hash (e.g. bookmarked or browser back lands here),
   // render the matching section. Falls back to 'home' for unknown hashes.
@@ -4211,45 +4240,73 @@ async function doRegister() {
   }
 }
 
+// v36.7: Forgot Password — verify identity via email + roll + DOB + parent's contact.
+// No ref code is sent by email. The backend verifies the four fields and
+// returns a one-time reset token (passed to resetPassword in the next step).
 async function doForgot() {
-  const email=getVal('forgot-email');
-  const errEl=document.getElementById('err-forgot');
+  const email = getVal('forgot-email');
+  const rollNo = (document.getElementById('forgot-roll-no')?.value || '').trim();
+  const rollBr = document.getElementById('forgot-roll-branch')?.value || '';
+  const rollYr = (document.getElementById('forgot-roll-year')?.value || '').trim();
+  const dob = (document.getElementById('forgot-dob')?.value || '').trim();
+  const guardianContact = (document.getElementById('forgot-guardian-contact')?.value || '').trim();
+  const rollFull = rollNo && rollBr && rollYr ? `${rollNo}/${rollBr}/${rollYr}` : '';
+  const errEl = document.getElementById('err-forgot');
   errEl.classList.add('hidden');
-  if(!email){errEl.textContent='Email required.';errEl.classList.remove('hidden');return;}
-  const btn=document.getElementById('btn-forgot');
-  btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dark"></span>';
-  const r=await callBackend('forgotPassword',{email});
-  btn.disabled=false;btn.textContent='Get Reset Code';
-  if(r.success){
+  if(!email || !rollFull || !dob || !guardianContact) {
+    errEl.textContent = 'All four fields are required: Email, Roll No., DOB, and Parent\'s Contact No.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  const btn = document.getElementById('btn-forgot');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span> Verifying…';
+  const r = await callBackend('forgotPassword', { email, rollFull, dob, guardianContact });
+  btn.disabled = false; btn.textContent = 'Verify & Continue';
+  if(r.success) {
+    // Store the reset token returned by the backend in the hidden input so
+    // doReset() can send it along with the new password.
+    const tokenInput = document.getElementById('reset-token');
+    if(tokenInput) tokenInput.value = r.resetToken || '';
     document.getElementById('forgot-step1').classList.add('hidden');
     document.getElementById('forgot-step2').classList.remove('hidden');
-    toast('Reset code sent to your email.','success');
-  } else if(r.error==='ACCOUNT_LOCKED') {
-    errEl.innerHTML=`🔒 <strong>Account locked.</strong> You have used all allowed password resets.<br/>
+    toast('Identity verified. Set your new password.', 'success');
+  } else if(r.error === 'ACCOUNT_LOCKED') {
+    errEl.innerHTML = `🔒 <strong>Account locked.</strong> You have used all allowed password resets.<br/>
       <span style="font-size:12px">Please contact the warden to unlock your account.</span>`;
     errEl.classList.remove('hidden');
   } else {
-    errEl.textContent=r.error||'Failed.';errEl.classList.remove('hidden');
+    errEl.textContent = r.error || 'Verification failed.';
+    errEl.classList.remove('hidden');
   }
 }
 
 async function doReset() {
-  const email=getVal('forgot-email');
-  const token=(document.getElementById('reset-token')?.value||"").trim();
-  const pwd=document.getElementById('reset-pwd')?.value||"";
-  const cpwd=document.getElementById('reset-cpwd')?.value||"";
-  const errEl=document.getElementById('err-reset');
+  const email = getVal('forgot-email');
+  // v36.7: token is now passed in a hidden input populated by doForgot() —
+  // the student no longer types a ref code manually.
+  const token = (document.getElementById('reset-token')?.value || '').trim();
+  const pwd = document.getElementById('reset-pwd')?.value || '';
+  const cpwd = document.getElementById('reset-cpwd')?.value || '';
+  const errEl = document.getElementById('err-reset');
   errEl.classList.add('hidden');
-  if(!token||!pwd||!cpwd){errEl.textContent='All fields required.';errEl.classList.remove('hidden');return;}
-  if(pwd!==cpwd){errEl.textContent='Passwords do not match.';errEl.classList.remove('hidden');return;}
-  const r=await callBackend('resetPassword',{email,token,newPassword:pwd});
-  if(r.success){
-    toast('Password reset! Please login with new password.','success');
+  if(!pwd || !cpwd) { errEl.textContent = 'New password and confirm password are required.'; errEl.classList.remove('hidden'); return; }
+  if(pwd !== cpwd) { errEl.textContent = 'Passwords do not match.'; errEl.classList.remove('hidden'); return; }
+  if(pwd.length < 4) { errEl.textContent = 'New password must be at least 4 characters.'; errEl.classList.remove('hidden'); return; }
+  if(!token) { errEl.textContent = 'Reset session expired. Please start over.'; errEl.classList.remove('hidden'); return; }
+  const r = await callBackend('resetPassword', { email, token, newPassword: pwd });
+  if(r.success) {
+    toast('Password reset! Please login with new password.', 'success');
     authTab('login');
     document.getElementById('forgot-step1').classList.remove('hidden');
     document.getElementById('forgot-step2').classList.add('hidden');
+    // Clear the forgot-password form fields so the next visit starts fresh
+    ['forgot-email','forgot-roll-no','forgot-roll-year','forgot-dob','forgot-guardian-contact','reset-token','reset-pwd','reset-cpwd'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.value = '';
+    });
   } else {
-    errEl.textContent=r.error||'Reset failed.';errEl.classList.remove('hidden');
+    errEl.textContent = r.error || 'Reset failed.';
+    errEl.classList.remove('hidden');
   }
 }
 
